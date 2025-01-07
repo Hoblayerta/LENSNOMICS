@@ -4,28 +4,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Coins } from "lucide-react";
 
 interface TokenBalanceProps {
-  tokenAddress: string;
   userAddress: string;
-  provider: any;
 }
 
-export function TokenBalance({ tokenAddress, userAddress, provider }: TokenBalanceProps) {
+export function TokenBalance({ userAddress }: TokenBalanceProps) {
   const [balance, setBalance] = useState<string>("0");
 
   useEffect(() => {
     const fetchBalance = async () => {
       try {
-        const bal = await getTokenBalance(tokenAddress, userAddress, provider);
-        setBalance(bal);
+        if (userAddress) {
+          const bal = await getTokenBalance(userAddress);
+          setBalance(bal);
+        }
       } catch (error) {
         console.error("Error fetching token balance:", error);
       }
     };
 
-    if (tokenAddress && userAddress && provider) {
-      fetchBalance();
-    }
-  }, [tokenAddress, userAddress, provider]);
+    fetchBalance();
+  }, [userAddress]);
 
   return (
     <Card>
