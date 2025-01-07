@@ -1,9 +1,9 @@
 import { parseEther } from 'viem';
 import { config } from './config';
 
-// Community token contract address (to be replaced with actual deployment)
-const COMMUNITY_TOKEN_ADDRESS = import.meta.env.VITE_COMMUNITY_TOKEN_ADDRESS || "0x123...";
-const POST_FEE = "0.1"; // 0.1 tokens per post
+// LENI token contract address
+const LENI_TOKEN_ADDRESS = "0xC94E29B30D5A33556C26e8188B3ce3c6d1003F86";
+const POST_FEE = "1"; // 1 LENI token per post
 
 // Token ABI for the minimal interface we need
 const TOKEN_ABI = [
@@ -15,13 +15,10 @@ const TOKEN_ABI = [
     outputs: [{ name: '', type: 'uint256' }]
   },
   {
-    name: 'transfer',
+    name: 'payPostFee',
     type: 'function',
     stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'to', type: 'address' },
-      { name: 'amount', type: 'uint256' }
-    ],
+    inputs: [{ name: 'poster', type: 'address' }],
     outputs: [{ name: '', type: 'bool' }]
   }
 ] as const;
@@ -29,7 +26,7 @@ const TOKEN_ABI = [
 export const getTokenBalance = async (address: string) => {
   try {
     const data = await config.publicClient.readContract({
-      address: COMMUNITY_TOKEN_ADDRESS as `0x${string}`,
+      address: LENI_TOKEN_ADDRESS as `0x${string}`,
       abi: TOKEN_ABI,
       functionName: 'balanceOf',
       args: [address as `0x${string}`]
@@ -37,30 +34,36 @@ export const getTokenBalance = async (address: string) => {
 
     return data.toString();
   } catch (error) {
-    console.error("Error fetching token balance:", error);
+    console.error("Error fetching LENI token balance:", error);
     return "0";
   }
 };
 
-export const handlePostFee = async (address: string) => {
+export const handlePostFee = async (userAddress: string) => {
   try {
     const feeAmount = parseEther(POST_FEE);
 
+    // Prepare the transaction to call payPostFee
     const { request } = await config.publicClient.simulateContract({
-      address: COMMUNITY_TOKEN_ADDRESS as `0x${string}`,
+      address: LENI_TOKEN_ADDRESS as `0x${string}`,
       abi: TOKEN_ABI,
-      functionName: 'transfer',
-      args: [COMMUNITY_TOKEN_ADDRESS as `0x${string}`, feeAmount],
-      account: address as `0x${string}`,
+      functionName: 'payPostFee',
+      args: [userAddress as `0x${string}`],
+      account: userAddress as `0x${string}`,
     });
 
+    // Get the wallet client and execute the transaction
     const walletClient = await config.publicClient.walletClient();
     const hash = await walletClient.writeContract(request);
+
+    // Wait for transaction confirmation
     await config.publicClient.waitForTransactionReceipt({ hash });
+
+    console.log('Post fee paid successfully:', hash);
     return true;
   } catch (error) {
-    console.error("Error handling post fee:", error);
-    throw new Error("Failed to process post fee");
+    console.error("Error handling LENI token post fee:", error);
+    throw new Error("Failed to process LENI token post fee. Make sure you have enough tokens and have approved the transaction.");
   }
 };
 
