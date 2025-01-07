@@ -7,16 +7,18 @@ import { useToast } from "@/components/ui/use-toast";
 import { leniContract } from "@/lib/contract";
 import { parseEther } from "viem";
 
+const DAILY_MINT_LIMIT = "10";
+
 export function MintTokens() {
   const [amount, setAmount] = useState("");
   const [isMinting, setIsMinting] = useState(false);
   const { toast } = useToast();
 
   const handleMint = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
+    if (!amount || parseFloat(amount) <= 0 || parseFloat(amount) > parseFloat(DAILY_MINT_LIMIT)) {
       toast({
         title: "Error",
-        description: "Please enter a valid amount",
+        description: `Please enter a valid amount between 1 and ${DAILY_MINT_LIMIT} LENI`,
         variant: "destructive",
       });
       return;
@@ -25,9 +27,9 @@ export function MintTokens() {
     try {
       setIsMinting(true);
       const parsedAmount = parseEther(amount);
-      
+
       // Call mint function on the contract
-      const tx = await leniContract.write("mint", [parsedAmount]);
+      const tx = await leniContract.call("mint", [parsedAmount]);
       await tx.wait();
 
       toast({
@@ -58,8 +60,14 @@ export function MintTokens() {
             type="number"
             placeholder="Amount to mint"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (parseFloat(value) <= parseFloat(DAILY_MINT_LIMIT)) {
+                setAmount(value);
+              }
+            }}
             min="0"
+            max={DAILY_MINT_LIMIT}
             step="1"
           />
           <Button 
@@ -79,7 +87,7 @@ export function MintTokens() {
         </div>
       </CardContent>
       <CardFooter className="text-sm text-muted-foreground">
-        Note: Tokens will be minted directly to your connected wallet
+        Note: Daily limit is {DAILY_MINT_LIMIT} LENI tokens
       </CardFooter>
     </Card>
   );
