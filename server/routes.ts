@@ -5,7 +5,6 @@ import { communities, users, communityMembers } from "@db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { posts, comments, votes, challenges, userChallenges, levels, tokenTransactions } from "@db/schema";
 
-
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
 
@@ -23,45 +22,33 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Token-gated Posts
+  // Posts endpoint
   app.get("/api/posts", async (req, res) => {
     try {
-      const { userAddress } = req.query;
       const allPosts = await db.query.posts.findMany({
-        orderBy: [desc(posts.createdAt)],
         with: {
           author: true,
+          community: true,
         },
+        orderBy: [desc(posts.createdAt)],
       });
 
-      // Filter token-gated content based on user's token balance
-      const filteredPosts = await Promise.all(allPosts.map(async (post) => {
-        if (!post.isTokenGated) return post;
-
-        const user = await db.query.users.findFirst({
-          where: eq(users.address, userAddress as string),
-        });
-
-        if (!user || BigInt(user.tokenBalance) < BigInt(post.requiredTokenAmount)) {
-          return { ...post, content: "🔒 Token-gated content" };
-        }
-        return post;
-      }));
-
-      res.json(filteredPosts);
+      res.json(allPosts);
     } catch (error) {
+      console.error("Error fetching posts:", error);
       res.status(500).json({ error: "Failed to fetch posts" });
     }
   });
 
   app.post("/api/posts", async (req, res) => {
     try {
-      const { content, authorId, isTokenGated, requiredTokenAmount } = req.body;
+      const { content, authorId, isTokenGated, requiredTokenAmount, communityId } = req.body;
       const newPost = await db.insert(posts).values({
         content,
         authorId,
         isTokenGated: isTokenGated || false,
         requiredTokenAmount: requiredTokenAmount || "0",
+        communityId
       }).returning();
       res.json(newPost[0]);
     } catch (error) {
@@ -252,8 +239,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Leaderboard
-  app.get("/api/leaderboard", async (req, res) => {
+  // Leaderboard endpoint
+  app.get("/api/leaderboard", async (_req, res) => {
     try {
       const leaderboard = await db.query.users.findMany({
         orderBy: [desc(users.tokenBalance)],
@@ -267,11 +254,12 @@ export function registerRoutes(app: Express) {
 
       res.json(rankedLeaderboard);
     } catch (error) {
+      console.error("Error fetching leaderboard:", error);
       res.status(500).json({ error: "Failed to fetch leaderboard" });
     }
   });
 
-  // Communities
+  // Communities endpoints
   app.get("/api/communities", async (_req, res) => {
     try {
       const allCommunities = await db.query.communities.findMany({
