@@ -15,10 +15,23 @@ const TOKEN_ABI = [
     outputs: [{ name: '', type: 'uint256' }]
   },
   {
-    name: 'payPostFee',
+    name: 'transfer',
     type: 'function',
     stateMutability: 'nonpayable',
-    inputs: [{ name: 'poster', type: 'address' }],
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'bool' }]
+  },
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
     outputs: [{ name: '', type: 'bool' }]
   }
 ] as const;
@@ -43,12 +56,12 @@ export const handlePostFee = async (userAddress: string) => {
   try {
     const feeAmount = parseEther(POST_FEE);
 
-    // Prepare the transaction to call payPostFee
+    // Prepare the transaction to transfer LENI tokens
     const { request } = await config.publicClient.simulateContract({
       address: LENI_TOKEN_ADDRESS as `0x${string}`,
       abi: TOKEN_ABI,
-      functionName: 'payPostFee',
-      args: [userAddress as `0x${string}`],
+      functionName: 'transfer',
+      args: [LENI_TOKEN_ADDRESS as `0x${string}`, feeAmount],
       account: userAddress as `0x${string}`,
     });
 
