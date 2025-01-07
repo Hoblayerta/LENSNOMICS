@@ -3,7 +3,6 @@ require("dotenv").config();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  analytics: false, // Disable analytics
   solidity: {
     version: "0.8.20",
     settings: {

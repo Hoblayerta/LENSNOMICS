@@ -1,11 +1,9 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-import dotenv from "dotenv";
-
-dotenv.config();
+import "dotenv/config";
 
 const config: HardhatUserConfig = {
-  analytics: false, // Disable analytics
+  analytics: false,
   solidity: {
     version: "0.8.20",
     settings: {

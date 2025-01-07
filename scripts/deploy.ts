@@ -1,13 +1,16 @@
-const { ethers } = require("hardhat");
-const fs = require("fs");
-const path = require("path");
+import { ethers } from "hardhat";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function main() {
   console.log('🚀 Starting deployment to Lens Network Sepolia Testnet...');
 
   // Get the deployer account
   const [deployer] = await ethers.getSigners();
-
   console.log('📡 Connected to Lens Network Sepolia Testnet');
   console.log('🔑 Deploying with account:', deployer.address);
 
@@ -54,7 +57,7 @@ async function main() {
 
     return { success: true, factoryAddress };
   } catch (error) {
-    console.error('❌ Deployment failed:', error instanceof Error ? error.message : String(error));
+    console.error('❌ Deployment failed:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
