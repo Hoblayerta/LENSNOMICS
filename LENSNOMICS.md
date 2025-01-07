@@ -1,4 +1,4 @@
-# Community Token Portal 🌐
+# Community Token Portal (LENSNOMICS) 🌐
 
 A cutting-edge decentralized social platform that revolutionizes community interactions through blockchain technology and innovative tokenization mechanisms.
 
