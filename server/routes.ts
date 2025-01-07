@@ -324,21 +324,22 @@ export function registerRoutes(app: Express): Server {
       // Get user
       const user = await db.query.users.findFirst({
         where: eq(users.address, address),
-        with: {
-          communityMemberships: {
-            with: {
-              community: true,
-            },
-          },
-        },
       });
 
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
 
+      // Get user's community memberships
+      const memberships = await db.query.communityMembers.findMany({
+        where: eq(communityMembers.userId, user.id),
+        with: {
+          community: true,
+        },
+      });
+
       // Transform the data for the dashboard
-      const earnings = user.communityMemberships.map(membership => ({
+      const earnings = memberships.map(membership => ({
         communityName: membership.community.name,
         tokenSymbol: membership.community.tokenSymbol,
         balance: membership.tokenBalance || "0",

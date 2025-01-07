@@ -17,11 +17,23 @@ interface TokenEarning {
 
 export function TokenDashboard() {
   const { address } = useAccount();
-  
+
   const { data: earnings, isLoading } = useQuery<TokenEarning[]>({
     queryKey: ["/api/token-earnings", address],
     enabled: !!address,
   });
+
+  if (!address) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-center text-muted-foreground">
+            Connect your wallet to view token earnings
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return (
