@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { TokenBalance } from "@/components/web3/TokenBalance";
+import { MintTokens } from "@/components/web3/MintTokens";
 import { getProfile } from "@/lib/lens";
 import { PostList } from "@/components/community/PostList";
 import { TokenDashboard } from "@/components/dashboard/TokenDashboard";
@@ -54,7 +55,10 @@ export function Profile() {
           </div>
         </CardHeader>
         <CardContent>
-          <TokenBalance userAddress={address} />
+          <div className="grid gap-6 md:grid-cols-2">
+            <TokenBalance userAddress={address} />
+            <MintTokens />
+          </div>
         </CardContent>
       </Card>
 
