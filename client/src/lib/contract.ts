@@ -4,26 +4,9 @@ import {
 } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 
-// Lens Network Sepolia Testnet configuration
-const lensTestnet = defineChain({
-  id: 37111,
-  name: "Lens Network Sepolia Testnet",
-  nativeCurrency: {
-    name: "GRASS",
-    symbol: "GRASS",
-    decimals: 18,
-  },
-  rpc: "https://rpc.testnet.lens.dev",
-  blockExplorer: {
-    name: "Lens Block Explorer",
-    url: "https://block-explorer.testnet.lens.dev",
-  },
-});
-
 // Create the thirdweb client
 export const client = createThirdwebClient({
   clientId: "19767ce00287f7b76207566f400a8f48",
-  secretKey: "kmJk4v8asibpNtEHxkcUfJCChlDWEqJe2I36Z98fg03Ph4lvtlq7vpAA7V-VJTKOpi_o0AD_5MmE15I9DPn6PA",
 });
 
 // LENI token contract interface
@@ -57,21 +40,20 @@ const LENI_ABI = [
 // Initialize LENI token contract
 export const leniContract = getContract({
   client,
-  chain: lensTestnet,
+  chain: defineChain(37111),
   address: "0xC94E29B30D5A33556C26e8188B3ce3c6d1003F86",
   abi: LENI_ABI,
 });
 
 // Function to get a contract instance with signer
 export const getSignedContract = async () => {
-  const wallet = await client.wallet.getConnectedWallet();
+  const wallet = await client.wallet.connect();
   if (!wallet) throw new Error("No wallet connected");
 
   return getContract({
     client,
-    chain: lensTestnet,
+    chain: defineChain(37111),
     address: "0xC94E29B30D5A33556C26e8188B3ce3c6d1003F86",
     abi: LENI_ABI,
-    wallet,
   });
 };
