@@ -25,8 +25,10 @@ export function registerRoutes(app: Express): Server {
   const provider = new ethers.JsonRpcProvider("https://rpc.testnet.lens.dev");
   const factoryAddress = process.env.FACTORY_ADDRESS;
 
+  // Add logging for debugging
+  console.log('Initializing routes with factory address:', factoryAddress);
   if (!factoryAddress) {
-    console.error("Factory address not found in environment variables");
+    console.error("Factory address not found in environment variables. Please run the deployment script first.");
   }
 
   // Token Creation endpoint
@@ -35,22 +37,24 @@ export function registerRoutes(app: Express): Server {
       const { name, symbol, creatorAddress } = req.body;
 
       if (!factoryAddress) {
-        throw new Error("Factory address not configured");
+        throw new Error("Factory address not configured. Please deploy the contract first.");
       }
 
       if (!process.env.DEPLOYER_PRIVATE_KEY) {
         throw new Error("Deployer private key not configured");
       }
 
+      console.log('Creating token with factory at address:', factoryAddress);
       const wallet = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
       const factory = new ethers.Contract(factoryAddress, CommunityTokenFactoryABI.abi, wallet);
 
       // Create token with initial supply of 1,000,000 tokens
+      console.log('Sending transaction to create token:', { name, symbol });
       const tx = await factory.createCommunityToken(name, symbol, 1000000);
-      console.log("Creating token transaction:", tx.hash);
+      console.log('Transaction sent:', tx.hash);
 
       const receipt = await tx.wait();
-      console.log("Transaction receipt:", receipt);
+      console.log('Transaction confirmed:', receipt.hash);
 
       // Get token address from event logs
       const event = receipt.logs.find(
@@ -62,7 +66,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const tokenAddress = event.args[0];
-      console.log("Created token at address:", tokenAddress);
+      console.log('Created token at address:', tokenAddress);
 
       res.json({
         tokenAddress,

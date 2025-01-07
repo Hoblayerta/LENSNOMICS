@@ -7,11 +7,18 @@ async function main() {
 
   // Get the deployer account
   const [deployer] = await ethers.getSigners();
-
   console.log('📡 Connected to Lens Network Sepolia Testnet');
   console.log('🔑 Deploying with account:', deployer.address);
 
   try {
+    // Check wallet balance
+    const balance = await deployer.provider.getBalance(deployer.address);
+    console.log('💰 Wallet balance:', ethers.formatEther(balance), 'ETH');
+
+    if (balance.toString() === '0') {
+      throw new Error('La wallet no tiene fondos. Por favor, asegúrate de tener ETH en la testnet de Lens Network Sepolia.');
+    }
+
     // Deploy Community Token Factory
     console.log('\n📄 Deploying Community Token Factory...');
     const CommunityTokenFactory = await ethers.getContractFactory('CommunityTokenFactory');
@@ -33,42 +40,30 @@ async function main() {
     fs.writeFileSync(deploymentPath, JSON.stringify(deploymentInfo, null, 2));
     console.log('\n📝 Deployment info saved to deployment.json');
 
-    // Update environment variables
+    // Create or update .env file
     const envPath = path.join(__dirname, '..', '.env');
-    let envContent = '';
-    try {
-      envContent = fs.readFileSync(envPath, 'utf8');
-    } catch (error) {
-      // File doesn't exist, create it
-    }
+    const envContent = `FACTORY_ADDRESS=${factoryAddress}\n`;
+    fs.writeFileSync(envPath, envContent, { flag: 'a' });
 
-    // Update or add FACTORY_ADDRESS
-    if (envContent.includes('FACTORY_ADDRESS=')) {
-      envContent = envContent.replace(/FACTORY_ADDRESS=.*\n/, `FACTORY_ADDRESS=${factoryAddress}\n`);
-    } else {
-      envContent += `\nFACTORY_ADDRESS=${factoryAddress}\n`;
-    }
+    // Set environment variable for immediate use
+    process.env.FACTORY_ADDRESS = factoryAddress;
 
-    fs.writeFileSync(envPath, envContent);
-    console.log('\n✨ Deployment completed successfully!');
-
+    console.log('✨ Deployment completed successfully!');
     return { success: true, factoryAddress };
   } catch (error) {
-    console.error('❌ Deployment failed:', error instanceof Error ? error.message : String(error));
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
+    console.error('❌ Error durante el deployment:', error instanceof Error ? error.message : String(error));
+    console.error('\n🔍 Detalles adicionales:');
+    console.error('- Asegúrate de que la private key es correcta');
+    console.error('- Verifica que la wallet tiene fondos en Lens Network Sepolia Testnet');
+    console.error('- Comprueba la conexión con la red');
+    process.exit(1);
   }
 }
 
 // Run the deployment
 main()
-  .then((result) => {
-    if (!result.success) {
-      console.error('Deployment failed:', result.error);
-      process.exit(1);
-    }
-    process.exit(0);
-  })
+  .then(() => process.exit(0))
   .catch((error) => {
-    console.error('❌ Deployment failed:', error);
+    console.error(error);
     process.exit(1);
   });
