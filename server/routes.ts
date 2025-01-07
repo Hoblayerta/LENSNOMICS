@@ -70,33 +70,41 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get user achievements
+  // Get user achievements and leaderboard
   app.get("/api/leaderboard", async (_req, res) => {
     try {
       const leaderboard = await db.select({
-        id: users.id,
         address: users.address,
         lensHandle: users.lensHandle,
-        tokenBalance: users.tokenBalance,
-        achievementPoints: db
-          .select({ total: sql`SUM(${achievements.points})` })
-          .from(userAchievements)
-          .innerJoin(achievements, eq(achievements.id, userAchievements.achievementId))
-          .where(eq(userAchievements.userId, users.id))
-          .limit(1),
-        achievements: db
-          .select({
-            name: achievements.name,
-            description: achievements.description,
-            icon: achievements.icon,
-            points: achievements.points,
-          })
-          .from(userAchievements)
-          .innerJoin(achievements, eq(achievements.id, userAchievements.achievementId))
-          .where(eq(userAchievements.userId, users.id)),
+        balance: users.tokenBalance,
+        achievementPoints: sql<number>`COALESCE(SUM(${achievements.points}), 0)`.as('points'),
+        achievements: sql<any[]>`
+          COALESCE(
+            ARRAY_AGG(
+              CASE WHEN ${achievements.id} IS NOT NULL
+              THEN jsonb_build_object(
+                'name', ${achievements.name},
+                'description', ${achievements.description},
+                'icon', ${achievements.icon},
+                'points', ${achievements.points}
+              )
+              ELSE NULL END
+            ) FILTER (WHERE ${achievements.id} IS NOT NULL),
+            '{}'::jsonb[]
+          )
+        `.as('achievements'),
       })
       .from(users)
-      .orderBy(desc(sql`achievement_points`))
+      .leftJoin(
+        userAchievements,
+        eq(userAchievements.userId, users.id)
+      )
+      .leftJoin(
+        achievements,
+        eq(achievements.id, userAchievements.achievementId)
+      )
+      .groupBy(users.id)
+      .orderBy(desc(sql`points`))
       .limit(10);
 
       res.json(leaderboard);
