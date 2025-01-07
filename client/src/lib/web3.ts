@@ -1,13 +1,14 @@
 import { parseEther } from 'viem';
-import { leniContract, getSignedContract } from './contract';
+import { getSignedContract } from './contract';
 
 // Constants
 const POST_FEE = "1"; // 1 LENI token per post
 
 export const getTokenBalance = async (address: string) => {
   try {
-    const balance = await leniContract.call("balanceOf", [address]);
-    return balance.toString();
+    const contract = await getSignedContract();
+    const balanceResult = await contract.prepare("balanceOf", [address]).execute();
+    return balanceResult.toString();
   } catch (error) {
     console.error("Error fetching LENI token balance:", error);
     return "0";
@@ -21,15 +22,16 @@ export const handlePostFee = async (userAddress: string) => {
     // Get contract with signer
     const contract = await getSignedContract();
 
-    // Call the contract to burn tokens
-    const tx = await contract.call("transfer", [
+    // Prepare and execute the transfer transaction
+    const transaction = await contract.prepare("transfer", [
       "0x000000000000000000000000000000000000dEaD", // Burn address
       feeAmount
     ]);
 
-    // Wait for transaction confirmation
-    const receipt = await tx.wait();
-    console.log('LENI tokens burned successfully:', receipt.transactionHash);
+    const result = await transaction.execute();
+    await result.wait();
+
+    console.log('LENI tokens burned successfully:', result.hash);
     return true;
   } catch (error) {
     console.error("Error burning LENI tokens:", error);

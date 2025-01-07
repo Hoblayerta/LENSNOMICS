@@ -31,9 +31,14 @@ export function MintTokens() {
       // Get contract with signer
       const contract = await getSignedContract();
 
-      // Call mint function on the contract
-      const tx = await contract.call("mint", [parsedAmount]);
-      await tx.wait();
+      // Prepare the mint transaction
+      const transaction = await contract.prepare("mint", [parsedAmount]);
+
+      // Execute the transaction
+      const result = await transaction.execute();
+
+      // Wait for transaction confirmation
+      await result.wait();
 
       toast({
         title: "Success",

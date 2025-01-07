@@ -5,7 +5,7 @@ import {
 import { defineChain } from "thirdweb/chains";
 
 // Create the thirdweb client
-export const client = createThirdwebClient({
+const client = createThirdwebClient({
   clientId: "19767ce00287f7b76207566f400a8f48",
 });
 
@@ -37,18 +37,13 @@ const LENI_ABI = [
   }
 ] as const;
 
-// Initialize LENI token contract
-export const leniContract = getContract({
-  client,
-  chain: defineChain(37111),
-  address: "0xC94E29B30D5A33556C26e8188B3ce3c6d1003F86",
-  abi: LENI_ABI,
-});
-
-// Function to get a contract instance with signer
+// Get contract instance
 export const getSignedContract = async () => {
   const wallet = await client.wallet.connect();
-  if (!wallet) throw new Error("No wallet connected");
+
+  if (!wallet) {
+    throw new Error("No wallet connected");
+  }
 
   return getContract({
     client,
