@@ -20,7 +20,7 @@ interface Community {
 export function Communities() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const { isConnected } = useAccount();
-  
+
   const { data: communities, isLoading } = useQuery<Community[]>({
     queryKey: ["/api/communities"],
   });
@@ -31,15 +31,13 @@ export function Communities() {
         <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-blue-500 text-transparent bg-clip-text">
           Communities
         </h1>
-        {isConnected && (
-          <Button 
-            onClick={() => setIsCreateOpen(true)}
-            className="bg-gradient-to-r from-purple-500 to-blue-500"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Create Community
-          </Button>
-        )}
+        <Button 
+          onClick={() => setIsCreateOpen(true)}
+          className="bg-gradient-to-r from-purple-500 to-blue-500"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Create Community
+        </Button>
       </div>
 
       {isLoading ? (
