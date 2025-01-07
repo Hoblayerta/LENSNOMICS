@@ -10,6 +10,7 @@ A cutting-edge decentralized social platform that revolutionizes community inter
 - **Achievement System**: Earn badges for community contributions
 - **Web3 Integration**: Built with Lens Protocol and blockchain authentication
 - **Real-time Analytics**: Track token earnings and engagement
+- **Lenis Agent** : to admin the tokenomics and help to engaging community.
 
 ## 🛠️ Technical Stack
 
@@ -23,7 +24,8 @@ A cutting-edge decentralized social platform that revolutionizes community inter
   - Node.js with Express
   - PostgreSQL Database
   - Drizzle ORM
-
+**AI Agent**:
+-ElizaOS 
 ## 🏗️ Local Setup
 
 1. Clone the repository:
@@ -89,13 +91,6 @@ A cutting-edge decentralized social platform that revolutionizes community inter
 - Daily minting limit is 10 LENI per wallet
 - Each post costs 1 LENI token to publish
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch: `git checkout -b feature/new-feature`
-3. Commit your changes: `git commit -m 'Add new feature'`
-4. Push to the branch: `git push origin feature/new-feature`
-5. Create a Pull Request
 
 ## 📄 License
 
