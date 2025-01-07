@@ -76,6 +76,7 @@
     "recharts": "^2.13.0",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
+    "thirdweb": "^5.82.0",
     "vaul": "^1.1.0",
     "viem": "^1.21.4",
     "wagmi": "^1.4.12",
