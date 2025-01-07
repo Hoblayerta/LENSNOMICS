@@ -27,6 +27,25 @@ const initialState: ThemeProviderState = {
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
+const paletteColors = {
+  ethereum: {
+    primary: "216 50% 40%",
+    accent: "216 50% 30%",
+  },
+  polygon: {
+    primary: "265 60% 40%",
+    accent: "265 60% 30%",
+  },
+  optimism: {
+    primary: "351 84% 44%",
+    accent: "351 84% 34%",
+  },
+  arbitrum: {
+    primary: "226 68% 40%",
+    accent: "226 68% 30%",
+  },
+};
+
 export function ThemeProvider({
   children,
   defaultTheme = "system",
@@ -53,8 +72,10 @@ export function ThemeProvider({
 
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove("ethereum", "polygon", "optimism", "arbitrum");
-    root.classList.add(palette);
+    const colors = paletteColors[palette];
+
+    root.style.setProperty("--primary", colors.primary);
+    root.style.setProperty("--accent", colors.accent);
   }, [palette]);
 
   const value = {

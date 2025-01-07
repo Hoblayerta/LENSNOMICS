@@ -1,11 +1,6 @@
 {
   "variant": "professional",
-  "primary": {
-    "ethereum": "hsl(216, 50%, 40%)",
-    "polygon": "hsl(265, 60%, 40%)",
-    "optimism": "hsl(351, 84%, 44%)",
-    "arbitrum": "hsl(226, 68%, 40%)"
-  },
+  "primary": "hsl(216, 50%, 40%)",
   "appearance": "system",
   "radius": 0.5
 }
