@@ -18,14 +18,29 @@ function App() {
         <ThemeProvider>
           <QueryClientProvider client={queryClient}>
             <div className="min-h-screen bg-background">
-              <div className="fixed top-4 right-4 z-50">
-                <ThemeSwitcher />
+              <nav className="fixed top-0 left-0 right-0 bg-background border-b border-border z-50 px-4 py-2">
+                <div className="container mx-auto flex justify-between items-center">
+                  <div className="flex items-center gap-6">
+                    <a href="/" className="text-xl font-bold bg-gradient-to-r from-purple-500 to-blue-500 text-transparent bg-clip-text">
+                      Community Hub
+                    </a>
+                    <a href="/communities" className="text-foreground hover:text-primary transition-colors">
+                      Communities
+                    </a>
+                    <a href="/profile" className="text-foreground hover:text-primary transition-colors">
+                      Profile
+                    </a>
+                  </div>
+                  <ThemeSwitcher />
+                </div>
+              </nav>
+              <div className="pt-16">
+                <Switch>
+                  <Route path="/" component={Home} />
+                  <Route path="/profile" component={Profile} />
+                  <Route path="/communities" component={Communities} />
+                </Switch>
               </div>
-              <Switch>
-                <Route path="/" component={Home} />
-                <Route path="/profile" component={Profile} />
-                <Route path="/communities" component={Communities} />
-              </Switch>
               <Toaster />
             </div>
           </QueryClientProvider>
