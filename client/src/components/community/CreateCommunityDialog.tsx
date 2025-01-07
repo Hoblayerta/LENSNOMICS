@@ -15,8 +15,8 @@ import { Loader2 } from "lucide-react";
 const formSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
+  tokenName: z.string().min(1, "Token name is required"),
   tokenSymbol: z.string().min(1, "Token symbol is required").max(5, "Token symbol must be 5 characters or less"),
-  requiredTokens: z.string().min(1, "Required tokens amount is required"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -30,14 +30,14 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
   const { address } = useAccount();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       description: "",
+      tokenName: "",
       tokenSymbol: "",
-      requiredTokens: "0",
     },
   });
 
@@ -46,7 +46,10 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
       const response = await fetch("/api/communities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, creatorAddress: address }),
+        body: JSON.stringify({
+          ...data,
+          creatorAddress: address,
+        }),
       });
 
       if (!response.ok) {
@@ -60,7 +63,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
       queryClient.invalidateQueries({ queryKey: ["/api/communities"] });
       toast({
         title: "Success",
-        description: "Community created successfully",
+        description: "Community created successfully with its own token!",
       });
       form.reset();
       onOpenChange(false);
@@ -74,10 +77,6 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
     },
   });
 
-  const onSubmit = (data: FormData) => {
-    mutation.mutate(data);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -85,7 +84,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
           <DialogTitle>Create New Community</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
             <FormField
               control={form.control}
               name="name"
@@ -99,6 +98,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="description"
@@ -107,7 +107,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
                   <FormLabel>Description</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Describe your community"
+                      placeholder="What is your community about?"
                       className="resize-none"
                       {...field}
                     />
@@ -116,6 +116,24 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="tokenName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Token Name</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="e.g., Community Token"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="tokenSymbol"
@@ -133,25 +151,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="requiredTokens"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Required Tokens to Join</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number"
-                      min="0"
-                      step="1"
-                      placeholder="0"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+
             <div className="flex justify-end">
               <Button
                 type="submit"
@@ -161,7 +161,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
                 {mutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
+                    Creating Community...
                   </>
                 ) : (
                   "Create Community"

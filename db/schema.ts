@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, uniqueIndex, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, uniqueIndex, boolean, jsonb } from "drizzle-orm/pg-core";
 import { relations, type RelationConfig } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
@@ -8,6 +8,7 @@ export const users = pgTable("users", {
   lensHandle: text("lens_handle"),
   tokenBalance: text("token_balance").default("0").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+  achievementPoints: integer("achievement_points").default(0).notNull(),
 });
 
 export const communities = pgTable("communities", {
@@ -43,23 +44,6 @@ export const posts = pgTable("posts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const usersRelations = relations(users, ({ many }) => ({
-  posts: many(posts),
-  communityMemberships: many(communityMembers),
-  createdCommunities: many(communities),
-}));
-
-export const communitiesRelations = relations(communities, ({ one, many }) => ({
-  creator: one(users, { fields: [communities.creatorId], references: [users.id] }),
-  members: many(communityMembers),
-  posts: many(posts),
-}));
-
-export const postsRelations = relations(posts, ({ one }) => ({
-  author: one(users, { fields: [posts.authorId], references: [users.id] }),
-  community: one(communities, { fields: [posts.communityId], references: [communities.id] }),
-}));
-
 export const comments = pgTable("comments", {
   id: serial("id").primaryKey(),
   postId: integer("post_id").references(() => posts.id),
@@ -67,11 +51,6 @@ export const comments = pgTable("comments", {
   content: text("content").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
-
-export const commentsRelations = relations(comments, ({ one }) => ({
-  post: one(posts, { fields: [comments.postId], references: [posts.id] }),
-  author: one(users, { fields: [comments.authorId], references: [users.id] }),
-}));
 
 export const directMessages = pgTable("direct_messages", {
   id: serial("id").primaryKey(),
@@ -131,7 +110,58 @@ export const tokenTransactions = pgTable("token_transactions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Export types and schemas
+export const achievements = pgTable("achievements", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  points: integer("points").notNull(),
+  icon: text("icon").notNull(), // Lucide icon name
+  criteria: jsonb("criteria").notNull(), // JSON object defining achievement criteria
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userAchievements = pgTable("user_achievements", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  achievementId: integer("achievement_id").references(() => achievements.id),
+  unlockedAt: timestamp("unlocked_at").defaultNow(),
+}, (table) => ({
+  userAchievementIdx: uniqueIndex('user_achievement_idx').on(table.userId, table.achievementId),
+}));
+
+
+export const usersRelations = relations(users, ({ many }) => ({
+  posts: many(posts),
+  communityMemberships: many(communityMembers),
+  createdCommunities: many(communities),
+  achievements: many(userAchievements),
+}));
+
+export const communitiesRelations = relations(communities, ({ one, many }) => ({
+  creator: one(users, { fields: [communities.creatorId], references: [users.id] }),
+  members: many(communityMembers),
+  posts: many(posts),
+}));
+
+export const postsRelations = relations(posts, ({ one }) => ({
+  author: one(users, { fields: [posts.authorId], references: [users.id] }),
+  community: one(communities, { fields: [posts.communityId], references: [communities.id] }),
+}));
+
+export const commentsRelations = relations(comments, ({ one }) => ({
+  post: one(posts, { fields: [comments.postId], references: [posts.id] }),
+  author: one(users, { fields: [comments.authorId], references: [users.id] }),
+}));
+
+export const achievementsRelations = relations(achievements, ({ many }) => ({
+  userAchievements: many(userAchievements),
+}));
+
+export const userAchievementsRelations = relations(userAchievements, ({ one }) => ({
+  user: one(users, { fields: [userAchievements.userId], references: [users.id] }),
+  achievement: one(achievements, { fields: [userAchievements.achievementId], references: [achievements.id] }),
+}));
+
 export type User = typeof users.$inferSelect;
 export type Community = typeof communities.$inferSelect;
 export type CommunityMember = typeof communityMembers.$inferSelect;
@@ -143,6 +173,8 @@ export type Challenge = typeof challenges.$inferSelect;
 export type UserChallenge = typeof userChallenges.$inferSelect;
 export type Level = typeof levels.$inferSelect;
 export type TokenTransaction = typeof tokenTransactions.$inferSelect;
+export type Achievement = typeof achievements.$inferSelect;
+export type UserAchievement = typeof userAchievements.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
@@ -152,3 +184,7 @@ export const insertPostSchema = createInsertSchema(posts);
 export const selectPostSchema = createSelectSchema(posts);
 export const insertChallengeSchema = createInsertSchema(challenges);
 export const selectChallengeSchema = createSelectSchema(challenges);
+export const insertAchievementSchema = createInsertSchema(achievements);
+export const selectAchievementSchema = createSelectSchema(achievements);
+export const insertUserAchievementSchema = createInsertSchema(userAchievements);
+export const selectUserAchievementSchema = createSelectSchema(userAchievements);

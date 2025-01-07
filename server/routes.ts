@@ -1,22 +1,53 @@
 import type { Express } from "express";
-import { createServer } from "http";
+import { createServer, type Server } from "http";
 import { db } from "@db";
-import { communities, users, communityMembers } from "@db/schema";
+import { 
+  communities, 
+  users, 
+  communityMembers, 
+  posts,
+  comments,
+  votes,
+  challenges,
+  userChallenges,
+  tokenTransactions
+} from "@db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
-import { posts, comments, votes, challenges, userChallenges, levels, tokenTransactions } from "@db/schema";
+import { lensClient } from "@/lib/config";
 
-export function registerRoutes(app: Express) {
+export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
+
+  // Token Creation endpoint
+  app.post("/api/communities/token", async (req, res) => {
+    try {
+      const { name, symbol, creatorAddress } = req.body;
+
+      // Generate a deterministic token address based on community name and creator
+      const tokenAddress = `0x${Buffer.from(`${name}${creatorAddress}${Date.now()}`).toString('hex').slice(0, 40)}`;
+
+      // In a production environment, this would interact with the actual blockchain
+      // For now, we'll simulate token creation with a mock address
+      res.json({
+        tokenAddress,
+        name,
+        symbol,
+      });
+    } catch (error) {
+      console.error("Error creating token:", error);
+      res.status(500).json({ error: "Failed to create token" });
+    }
+  });
 
   // Auth and User Management
   app.post("/api/users", async (req, res) => {
     try {
       const { address, lensHandle } = req.body;
-      const newUser = await db.insert(users).values({
+      const [newUser] = await db.insert(users).values({
         address,
         lensHandle,
       }).returning();
-      res.json(newUser[0]);
+      res.json(newUser);
     } catch (error) {
       res.status(500).json({ error: "Failed to create user" });
     }
@@ -243,13 +274,29 @@ export function registerRoutes(app: Express) {
   app.get("/api/leaderboard", async (_req, res) => {
     try {
       const leaderboard = await db.query.users.findMany({
-        orderBy: [desc(users.tokenBalance)],
+        with: {
+          achievements: {
+            with: {
+              achievement: true,
+            },
+          },
+        },
+        orderBy: [desc(users.achievementPoints)],
         limit: 10,
       });
 
       const rankedLeaderboard = leaderboard.map((user, index) => ({
-        ...user,
+        address: user.address,
+        lensHandle: user.lensHandle,
+        balance: user.tokenBalance,
+        achievementPoints: user.achievementPoints,
         rank: index + 1,
+        achievements: user.achievements.map(ua => ({
+          name: ua.achievement.name,
+          description: ua.achievement.description,
+          icon: ua.achievement.icon,
+          points: ua.achievement.points,
+        })),
       }));
 
       res.json(rankedLeaderboard);
@@ -293,7 +340,24 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/communities", async (req, res) => {
     try {
-      const { name, description, tokenSymbol, requiredTokens, creatorAddress } = req.body;
+      const { name, description, tokenName, tokenSymbol, creatorAddress } = req.body;
+
+      // First create the token
+      const tokenResponse = await fetch(`http://localhost:${process.env.PORT}/api/communities/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: tokenName,
+          symbol: tokenSymbol,
+          creatorAddress,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error("Failed to create token");
+      }
+
+      const { tokenAddress } = await tokenResponse.json();
 
       // Get or create user
       let user = await db.query.users.findFirst({
@@ -302,13 +366,15 @@ export function registerRoutes(app: Express) {
 
       if (!user) {
         const [newUser] = await db.insert(users)
-          .values({ address: creatorAddress })
+          .values({ 
+            address: creatorAddress,
+            tokenBalance: "0"
+          })
           .returning();
         user = newUser;
       }
 
-      // Create community with generated token address
-      const tokenAddress = `0x${Math.random().toString(16).slice(2)}`;
+      // Create community with the token address
       const [community] = await db.insert(communities)
         .values({
           name,
@@ -316,7 +382,7 @@ export function registerRoutes(app: Express) {
           creatorId: user.id,
           tokenAddress,
           tokenSymbol,
-          requiredTokens,
+          requiredTokens: "0"
         })
         .returning();
 
@@ -325,7 +391,17 @@ export function registerRoutes(app: Express) {
         .values({
           userId: user.id,
           communityId: community.id,
-          tokenBalance: "1000", // Initial token allocation for creator
+          tokenBalance: "1000000", // Initial token allocation for creator
+        });
+
+      // Record token transaction
+      await db.insert(tokenTransactions)
+        .values({
+          fromAddress: "0x0", // System mint
+          toAddress: creatorAddress,
+          amount: "1000000",
+          type: "mint",
+          txHash: `mint_${Date.now()}`, // Placeholder for demo
         });
 
       res.json(community);

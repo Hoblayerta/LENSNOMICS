@@ -10,12 +10,15 @@ const { chains, publicClient, webSocketPublicClient } = configureChains(
   [publicProvider()]
 );
 
+// Fallback to a test project ID if not provided
+const projectId = import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID || 'test-project-id';
+
 // Set up wagmi config with ConnectKit
 export const config = createConfig(
   getDefaultConfig({
     autoConnect: true,
     appName: "Community Hub",
-    walletConnectProjectId: "YOUR_WALLET_CONNECT_PROJECT_ID", 
+    walletConnectProjectId: projectId,
     chains,
     publicClient,
     webSocketPublicClient,
@@ -29,3 +32,6 @@ export const lensClient = new LensClient({
 
 // Export chains for use in other parts of the app
 export { chains };
+
+// Export types
+export type ProfileType = Awaited<ReturnType<typeof lensClient.profile.fetch>>;
