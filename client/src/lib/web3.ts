@@ -56,12 +56,15 @@ export const handlePostFee = async (userAddress: string) => {
   try {
     const feeAmount = parseEther(POST_FEE);
 
-    // Prepare the transaction to transfer LENI tokens
+    // Prepare the transaction to burn LENI tokens
     const { request } = await config.publicClient.simulateContract({
       address: LENI_TOKEN_ADDRESS as `0x${string}`,
       abi: TOKEN_ABI,
       functionName: 'transfer',
-      args: [LENI_TOKEN_ADDRESS as `0x${string}`, feeAmount],
+      args: [
+        "0x000000000000000000000000000000000000dEaD" as `0x${string}`, // Burn address
+        feeAmount
+      ],
       account: userAddress as `0x${string}`,
     });
 
@@ -72,11 +75,11 @@ export const handlePostFee = async (userAddress: string) => {
     // Wait for transaction confirmation
     await config.publicClient.waitForTransactionReceipt({ hash });
 
-    console.log('Post fee paid successfully:', hash);
+    console.log('LENI tokens burned successfully:', hash);
     return true;
   } catch (error) {
-    console.error("Error handling LENI token post fee:", error);
-    throw new Error("Failed to process LENI token post fee. Make sure you have enough tokens and have approved the transaction.");
+    console.error("Error burning LENI tokens:", error);
+    throw new Error("Failed to burn LENI tokens. Make sure you have enough tokens and have approved the transaction.");
   }
 };
 
