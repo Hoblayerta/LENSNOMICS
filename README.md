@@ -1,99 +1,94 @@
 # Community Token Portal 🌐
 
-A cutting-edge decentralized social platform that revolutionizes community interactions through blockchain-powered token economics. Built on Lens Protocol, this platform enables users to engage, earn, and transfer tokens within a dynamic Web3 social network that rewards meaningful participation.
+Una plataforma social descentralizada que revoluciona las interacciones comunitarias a través de la economía de tokens basada en blockchain. Construida sobre el Protocolo Lens, esta plataforma permite a los usuarios participar, ganar y transferir tokens dentro de una red social Web3 dinámica.
 
-## 🚀 Features
+## 🚀 Características
 
-- **Community Creation**: Users can create their own communities with custom tokens
-- **Token Economics**: Each community has its own token for rewards and governance
-- **Social Interactions**: Post, comment, and like content to earn tokens
-- **Achievement System**: Earn badges for community contributions
-- **Web3 Integration**: Built on Lens Protocol with blockchain-based authentication
-- **Real-time Analytics**: Track token earnings and community engagement
+- **Creación de Comunidades**: Los usuarios pueden crear sus propias comunidades con tokens personalizados
+- **Economía de Tokens**: Cada comunidad tiene su propio token para recompensas y gobernanza
+- **Interacciones Sociales**: Publica, comenta y da me gusta para ganar tokens
+- **Sistema de Logros**: Gana insignias por contribuciones a la comunidad
+- **Integración Web3**: Construido con Protocolo Lens y autenticación blockchain
+- **Análisis en Tiempo Real**: Seguimiento de ganancias de tokens y participación
 
-## 🛠️ Technical Stack
+## 🛠️ Stack Tecnológico
 
-- **Frontend**: React + TypeScript with Vite
+- **Frontend**: React + TypeScript con Vite
 - **Styling**: TailwindCSS + shadcn/ui
 - **Web3**:
-  - Lens Protocol for social graph
-  - ConnectKit + wagmi for wallet connections
-  - Polygon Mumbai testnet
+  - Lens Protocol para el grafo social
+  - ConnectKit + wagmi para conexiones de wallet
+  - Thirdweb SDK para interacciones con smart contracts
 - **Backend**:
-  - Node.js with Express
-  - Neon Database (Serverless Postgres)
+  - Node.js con Express
+  - PostgreSQL Database
   - Drizzle ORM
 
-## 🏗️ Architecture
+## 🏗️ Configuración Local
 
-- Decentralized social graph powered by Lens Protocol
-- Community-specific token contracts for incentivization
-- Real-time token distribution based on user engagement
-- Achievement system with on-chain verification
+1. Clona el repositorio:
+   ```bash
+   git clone [URL_DEL_REPO]
+   cd [NOMBRE_DEL_REPO]
+   ```
 
-## 🚦 Getting Started
-
-1. Clone the repository
-2. Install dependencies:
+2. Instala las dependencias:
    ```bash
    npm install
    ```
 
-3. Set up environment variables:
+3. Configura las variables de entorno:
+   Crea un archivo `.env` en la raíz del proyecto con:
    ```env
-   DATABASE_URL=your_neon_database_url
-   WALLET_CONNECT_PROJECT_ID=your_wallet_connect_project_id
+   DATABASE_URL=postgresql://[usuario]:[contraseña]@[host]:[puerto]/[nombre_db]
+   WALLET_CONNECT_PROJECT_ID=19767ce00287f7b76207566f400a8f48
+   DEPLOYER_PRIVATE_KEY=[tu_private_key]
    ```
 
-4. Initialize the database:
+4. Inicializa la base de datos:
    ```bash
    npm run db:push
    ```
 
-5. Start the development server:
+5. Inicia el servidor de desarrollo:
    ```bash
    npm run dev
    ```
 
-## 🌍 Deployment
+6. Abre el navegador en `http://localhost:5000`
 
-The application is configured to deploy on Replit with the following features:
-- Automatic HTTPS
-- PostgreSQL database integration
-- Environment variable management
-- Real-time collaboration
+## 🔑 Funcionalidades Principales
 
-## 🤝 Contributing
+### Token LENI
+- Dirección del Contrato: `0xC94E29B30D5A33556C26e8188B3ce3c6d1003F86`
+- Red: Testnet (Chain ID: 37111)
+- Límite de Minteo: 10 LENI por día
+- Funciones:
+  - Minteo de tokens
+  - Quemado de tokens por publicación
+  - Visualización de balance en tiempo real
 
-This project is open for contributions. Please follow these steps:
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
+### Sistema de Logros
+- Logros desbloqueables por acciones
+- Recompensas en tokens LENI
+- Progresión de nivel basada en XP
+- Tablero de clasificación en tiempo real
 
-## 📄 License
+## 📝 Notas Importantes
+
+- El contrato de LENI está desplegado en la testnet
+- Se requiere una wallet compatible con Web3 (MetaMask recomendado)
+- Las transacciones requieren gas en la testnet
+- El límite de minteo diario es de 10 LENI por wallet
+
+## 🤝 Contribuir
+
+1. Haz fork del repositorio
+2. Crea una rama para tu feature: `git checkout -b feature/nueva-funcionalidad`
+3. Commitea tus cambios: `git commit -m 'Añade nueva funcionalidad'`
+4. Push a la rama: `git push origin feature/nueva-funcionalidad`
+5. Crea un Pull Request
+
+## 📄 Licencia
 
 MIT License
-
-## 🏆 Hackathon Submission
-
-This project was built for [Hackathon Name] to demonstrate the potential of Web3 social platforms powered by Lens Protocol. It showcases:
-
-- Integration with Lens Protocol on testnet
-- Custom token economics for community engagement
-- Achievement system with on-chain verification
-- Real-time analytics and token distribution
-
-### Demo Links
-- Live Demo: [Your Replit URL]
-- Video Demo: [Add your demo video link]
-- Pitch Deck: [Add your pitch deck link]
-
-### Team
-- [Your Name/Team Members]
-- Contact: [Your Contact Information]
-
-### Next Steps
-- [ ] Deploy to Lens Protocol mainnet
-- [ ] Implement governance features
-- [ ] Add advanced analytics dashboard
-- [ ] Mobile app development
