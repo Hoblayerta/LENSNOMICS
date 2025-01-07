@@ -1,8 +1,8 @@
-import { configureChains, createConfig } from 'wagmi';
+import { createConfig, configureChains } from 'wagmi';
 import { polygonMumbai } from 'wagmi/chains';
-import { InjectedConnector } from 'wagmi/connectors/injected';
 import { publicProvider } from 'wagmi/providers/public';
-import { development, LensClient } from '@lens-protocol/client';
+import { getDefaultConfig } from "connectkit";
+import { LensClient, development } from '@lens-protocol/client';
 
 // Configure chains & providers
 const { chains, publicClient, webSocketPublicClient } = configureChains(
@@ -10,21 +10,17 @@ const { chains, publicClient, webSocketPublicClient } = configureChains(
   [publicProvider()]
 );
 
-// Set up wagmi config
-export const config = createConfig({
-  autoConnect: true,
-  connectors: [
-    new InjectedConnector({
-      chains,
-      options: {
-        name: 'Injected',
-        shimDisconnect: true,
-      },
-    }),
-  ],
-  publicClient,
-  webSocketPublicClient,
-});
+// Set up wagmi config with ConnectKit
+export const config = createConfig(
+  getDefaultConfig({
+    autoConnect: true,
+    appName: "Community Hub",
+    walletConnectProjectId: "YOUR_WALLET_CONNECT_PROJECT_ID", 
+    chains,
+    publicClient,
+    webSocketPublicClient,
+  })
+);
 
 // Initialize Lens Protocol client
 export const lensClient = new LensClient({

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
 import { handlePostFee, hasEnoughTokens } from "@/lib/web3";
-import { useAccount, useProvider, useSendTransaction } from "wagmi";
+import { useAccount, useWalletClient } from "wagmi";
 import { Loader2 } from "lucide-react";
 
 export function CreatePost() {
@@ -13,20 +13,23 @@ export function CreatePost() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
-  const provider = useProvider();
-  const { sendTransaction } = useSendTransaction();
+  const { data: walletClient } = useWalletClient();
 
   const mutation = useMutation({
     mutationFn: async () => {
       try {
+        if (!address || !walletClient) {
+          throw new Error("Wallet not connected");
+        }
+
         // Check if user has enough tokens
-        const hasTokens = await hasEnoughTokens(address!, provider);
+        const hasTokens = await hasEnoughTokens(address);
         if (!hasTokens) {
           throw new Error("Insufficient tokens to create post");
         }
 
         // Handle the post fee first
-        await handlePostFee(provider);
+        await handlePostFee(address);
 
         // After successful fee payment, create the post
         const response = await fetch("/api/posts", {

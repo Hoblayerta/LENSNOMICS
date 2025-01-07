@@ -1,5 +1,4 @@
-import { ethers } from 'ethers';
-import { createWalletClient, custom, parseEther } from 'viem';
+import { parseEther } from 'viem';
 import { config } from './config';
 
 // Community token contract address (to be replaced with actual deployment)
@@ -26,39 +25,6 @@ const TOKEN_ABI = [
     outputs: [{ name: '', type: 'bool' }]
   }
 ] as const;
-
-export const connectWallet = async () => {
-  try {
-    if (!window.ethereum) throw new Error("No crypto wallet found");
-
-    const walletClient = createWalletClient({
-      chain: config.chains[0],
-      transport: custom(window.ethereum)
-    });
-    const [address] = await walletClient.requestAddresses();
-    const provider = walletClient.getProvider();
-
-    // Register user in the backend
-    await fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address })
-    });
-
-    return {
-      provider: provider,
-      signer: walletClient,
-      address
-    };
-  } catch (error) {
-    console.error("Error connecting wallet:", error);
-    throw error;
-  }
-};
-
-export const disconnectWallet = async () => {
-  //  No action needed here for viem
-};
 
 export const getTokenBalance = async (address: string) => {
   try {
@@ -88,7 +54,8 @@ export const handlePostFee = async (address: string) => {
       account: address as `0x${string}`,
     });
 
-    const hash = await config.publicClient.writeContract(request);
+    const walletClient = await config.publicClient.walletClient();
+    const hash = await walletClient.writeContract(request);
     await config.publicClient.waitForTransactionReceipt({ hash });
     return true;
   } catch (error) {

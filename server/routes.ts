@@ -1,11 +1,10 @@
 import type { Express } from "express";
 import { createServer } from "http";
 import { db } from "@db";
-import { 
-  posts, comments, users, votes, challenges, 
-  userChallenges, levels, tokenTransactions 
-} from "@db/schema";
+import { communities, users, communityMembers } from "@db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
+import { posts, comments, votes, challenges, userChallenges, levels, tokenTransactions } from "@db/schema";
+
 
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
@@ -269,6 +268,82 @@ export function registerRoutes(app: Express) {
       res.json(rankedLeaderboard);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
+  // Communities
+  app.get("/api/communities", async (_req, res) => {
+    try {
+      const allCommunities = await db.query.communities.findMany({
+        with: {
+          creator: true,
+        },
+        orderBy: [desc(communities.createdAt)],
+      });
+
+      // Get member count for each community
+      const communitiesWithMemberCount = await Promise.all(
+        allCommunities.map(async (community) => {
+          const memberCount = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(communityMembers)
+            .where(eq(communityMembers.communityId, community.id));
+
+          return {
+            ...community,
+            memberCount: memberCount[0].count,
+          };
+        })
+      );
+
+      res.json(communitiesWithMemberCount);
+    } catch (error) {
+      console.error("Error fetching communities:", error);
+      res.status(500).json({ error: "Failed to fetch communities" });
+    }
+  });
+
+  app.post("/api/communities", async (req, res) => {
+    try {
+      const { name, description, tokenSymbol, requiredTokens, creatorAddress } = req.body;
+
+      // Get or create user
+      let user = await db.query.users.findFirst({
+        where: eq(users.address, creatorAddress),
+      });
+
+      if (!user) {
+        const [newUser] = await db.insert(users)
+          .values({ address: creatorAddress })
+          .returning();
+        user = newUser;
+      }
+
+      // Create community with generated token address
+      const tokenAddress = `0x${Math.random().toString(16).slice(2)}`;
+      const [community] = await db.insert(communities)
+        .values({
+          name,
+          description,
+          creatorId: user.id,
+          tokenAddress,
+          tokenSymbol,
+          requiredTokens,
+        })
+        .returning();
+
+      // Add creator as first member
+      await db.insert(communityMembers)
+        .values({
+          userId: user.id,
+          communityId: community.id,
+          tokenBalance: "1000", // Initial token allocation for creator
+        });
+
+      res.json(community);
+    } catch (error) {
+      console.error("Error creating community:", error);
+      res.status(500).json({ error: "Failed to create community" });
     }
   });
 
