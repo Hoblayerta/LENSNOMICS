@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { TokenBalance } from "@/components/web3/TokenBalance";
 import { getProfile } from "@/lib/lens";
 import { PostList } from "@/components/community/PostList";
+import { TokenDashboard } from "@/components/dashboard/TokenDashboard";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function Profile() {
@@ -37,13 +38,13 @@ export function Profile() {
           </div>
         </CardHeader>
         <CardContent>
-          <TokenBalance 
-            tokenAddress="0x..." 
-            userAddress="0x..." 
-            provider={null}
-          />
+          <TokenBalance userAddress="0x..." />
         </CardContent>
       </Card>
+
+      <div className="mb-8">
+        <TokenDashboard />
+      </div>
 
       <h2 className="text-xl font-semibold mb-4">My Posts</h2>
       <PostList />

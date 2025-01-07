@@ -316,5 +316,46 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Token earnings endpoint
+  app.get("/api/token-earnings/:address", async (req, res) => {
+    try {
+      const { address } = req.params;
+
+      // Get user
+      const user = await db.query.users.findFirst({
+        where: eq(users.address, address),
+        with: {
+          communityMemberships: {
+            with: {
+              community: true,
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Transform the data for the dashboard
+      const earnings = user.communityMemberships.map(membership => ({
+        communityName: membership.community.name,
+        tokenSymbol: membership.community.tokenSymbol,
+        balance: membership.tokenBalance || "0",
+        // For now, we'll create mock history data
+        // In a production app, we'd store this in a separate table
+        history: Array.from({ length: 7 }, (_, i) => ({
+          timestamp: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
+          amount: (parseFloat(membership.tokenBalance || "0") / (i + 1)).toFixed(2),
+        })).reverse(),
+      }));
+
+      res.json(earnings);
+    } catch (error) {
+      console.error("Error fetching token earnings:", error);
+      res.status(500).json({ error: "Failed to fetch token earnings" });
+    }
+  });
+
   return httpServer;
 }
