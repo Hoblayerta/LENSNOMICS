@@ -7,6 +7,8 @@ export const users = pgTable("users", {
   address: text("address").unique().notNull(),
   lensHandle: text("lens_handle"),
   tokenBalance: text("token_balance").default("0").notNull(),
+  level: integer("level").default(1).notNull(),
+  xp: integer("xp").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -17,7 +19,7 @@ export const communities = pgTable("communities", {
   creatorId: integer("creator_id").references(() => users.id),
   tokenAddress: text("token_address").unique().notNull(),
   tokenSymbol: text("token_symbol").notNull(),
-  initialTokens: text("initial_tokens").default("100").notNull(), // Tokens given to new members
+  initialTokens: text("initial_tokens").default("100").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -53,7 +55,7 @@ export const votes = pgTable("votes", {
   id: serial("id").primaryKey(),
   postId: integer("post_id").references(() => posts.id),
   userId: integer("user_id").references(() => users.id),
-  value: integer("value").notNull(), // 1 for like
+  value: integer("value").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   postUserIdx: uniqueIndex('post_user_vote_idx').on(table.postId, table.userId),
@@ -64,11 +66,15 @@ export const achievements = pgTable("achievements", {
   name: text("name").notNull(),
   description: text("description").notNull(),
   criteria: json("criteria").$type<{
-    type: "post_count" | "like_count" | "comment_count" | "token_balance";
+    type: "post_count" | "like_count" | "comment_count" | "token_balance" | "web3_interaction" | "community_engagement" | "token_transfer" | "first_mint";
     threshold: number;
   }>().notNull(),
   points: integer("points").notNull(),
+  xpReward: integer("xp_reward").default(0).notNull(),
+  tokenReward: text("token_reward").default("0").notNull(),
   icon: text("icon").notNull(),
+  category: text("category").default("general").notNull(),
+  order: integer("display_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -113,6 +119,13 @@ export const votesRelations = relations(votes, ({ one }) => ({
 
 export const achievementsRelations = relations(achievements, ({ many }) => ({
   userAchievements: many(userAchievements),
+}));
+
+export const userProgressRelations = relations(users, ({ many }) => ({
+  achievements: many(userAchievements),
+  posts: many(posts),
+  communityMemberships: many(communityMembers),
+  createdCommunities: many(communities),
 }));
 
 

@@ -5,6 +5,7 @@ import { MintTokens } from "@/components/web3/MintTokens";
 import { getProfile } from "@/lib/lens";
 import { PostList } from "@/components/community/PostList";
 import { TokenDashboard } from "@/components/dashboard/TokenDashboard";
+import { ProgressionTracker } from "@/components/progression/ProgressionTracker";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAccount } from "wagmi";
 
@@ -41,33 +42,39 @@ export function Profile() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Card className="mb-8">
-        <CardHeader>
-          <div className="flex items-center space-x-4">
-            <Avatar className="h-20 w-20">
-              <AvatarImage src={profile?.picture?.original?.url} />
-              <AvatarFallback>{address.slice(0, 2)}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h1 className="text-2xl font-bold">{profile?.handle || `${address.slice(0, 6)}...${address.slice(-4)}`}</h1>
-              <p className="text-muted-foreground">{profile?.bio}</p>
+      <div className="grid gap-8">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={profile?.picture?.original?.url} />
+                <AvatarFallback>{address.slice(0, 2)}</AvatarFallback>
+              </Avatar>
+              <div>
+                <h1 className="text-2xl font-bold">{profile?.handle || `${address.slice(0, 6)}...${address.slice(-4)}`}</h1>
+                <p className="text-muted-foreground">{profile?.bio}</p>
+              </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 md:grid-cols-2">
-            <TokenBalance userAddress={address} />
-            <MintTokens />
-          </div>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 md:grid-cols-2">
+              <TokenBalance userAddress={address} />
+              <MintTokens />
+            </div>
+          </CardContent>
+        </Card>
 
-      <div className="mb-8">
-        <TokenDashboard userAddress={address} />
+        <ProgressionTracker />
+
+        <div className="mb-8">
+          <TokenDashboard userAddress={address} />
+        </div>
+
+        <div>
+          <h2 className="text-xl font-semibold mb-4">My Posts</h2>
+          <PostList />
+        </div>
       </div>
-
-      <h2 className="text-xl font-semibold mb-4">My Posts</h2>
-      <PostList />
     </div>
   );
 }

@@ -57,8 +57,8 @@ export function registerRoutes(app: Express): Server {
         const balance = await leniToken.balanceOf(user.address);
 
         if (balance < POST_FEE) {
-          return res.status(400).json({ 
-            error: `Insufficient LENI tokens. You need at least ${ethers.formatEther(POST_FEE)} LENI tokens to create a post.` 
+          return res.status(400).json({
+            error: `Insufficient LENI tokens. You need at least ${ethers.formatEther(POST_FEE)} LENI tokens to create a post.`
           });
         }
 
@@ -124,10 +124,10 @@ export function registerRoutes(app: Express): Server {
           tokenSymbol: communities.tokenSymbol,
         },
       })
-      .from(posts)
-      .leftJoin(users, eq(posts.authorId, users.id))
-      .leftJoin(communities, eq(posts.communityId, communities.id))
-      .orderBy(desc(posts.createdAt));
+        .from(posts)
+        .leftJoin(users, eq(posts.authorId, users.id))
+        .leftJoin(communities, eq(posts.communityId, communities.id))
+        .orderBy(desc(posts.createdAt));
 
       res.json(allPosts);
     } catch (error) {
@@ -255,6 +255,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+
   // Get user achievements and leaderboard
   app.get("/api/leaderboard", async (_req, res) => {
     try {
@@ -279,18 +280,18 @@ export function registerRoutes(app: Express): Server {
           )
         `.as('achievements'),
       })
-      .from(users)
-      .leftJoin(
-        userAchievements,
-        eq(userAchievements.userId, users.id)
-      )
-      .leftJoin(
-        achievements,
-        eq(achievements.id, userAchievements.achievementId)
-      )
-      .groupBy(users.id)
-      .orderBy(desc(sql`points`))
-      .limit(10);
+        .from(users)
+        .leftJoin(
+          userAchievements,
+          eq(userAchievements.userId, users.id)
+        )
+        .leftJoin(
+          achievements,
+          eq(achievements.id, userAchievements.achievementId)
+        )
+        .groupBy(users.id)
+        .orderBy(desc(sql`points`))
+        .limit(10);
 
       res.json(leaderboard);
     } catch (error) {
@@ -302,6 +303,13 @@ export function registerRoutes(app: Express): Server {
   // Check and award achievements after certain actions
   async function checkAndAwardAchievements(userId: number) {
     try {
+      // Get user
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+
+      if (!user) return;
+
       // Get user stats
       const stats = await db.select({
         postCount: sql`COUNT(DISTINCT ${posts.id})`,
@@ -310,14 +318,14 @@ export function registerRoutes(app: Express): Server {
         communityCount: sql`COUNT(DISTINCT ${communities.id})`,
         tokenBalance: users.tokenBalance,
       })
-      .from(users)
-      .leftJoin(posts, eq(posts.authorId, users.id))
-      .leftJoin(comments, eq(comments.authorId, users.id))
-      .leftJoin(votes, eq(votes.userId, users.id))
-      .leftJoin(communities, eq(communities.creatorId, users.id))
-      .where(eq(users.id, userId))
-      .groupBy(users.id)
-      .execute();
+        .from(users)
+        .leftJoin(posts, eq(posts.authorId, users.id))
+        .leftJoin(comments, eq(comments.authorId, users.id))
+        .leftJoin(votes, eq(votes.userId, users.id))
+        .leftJoin(communities, eq(communities.creatorId, users.id))
+        .where(eq(users.id, userId))
+        .groupBy(users.id)
+        .execute();
 
       if (!stats.length) return;
 
@@ -360,6 +368,37 @@ export function registerRoutes(app: Express): Server {
               achievementId: achievement.id,
             })
             .onConflictDoNothing();
+
+          // Award XP and check for level up
+          const newXp = user.xp + achievement.xpReward;
+          const xpForNextLevel = user.level * 1000;
+          let newLevel = user.level;
+
+          // Level up if enough XP
+          if (newXp >= xpForNextLevel) {
+            newLevel++;
+            // Award level up bonus (100 LENI tokens)
+            const newTokenBalance = (BigInt(user.tokenBalance) + BigInt("100")).toString();
+            await db.update(users)
+              .set({ tokenBalance: newTokenBalance })
+              .where(eq(users.id, userId));
+          }
+
+          // Update user XP and level
+          await db.update(users)
+            .set({
+              xp: newXp,
+              level: newLevel,
+            })
+            .where(eq(users.id, userId));
+
+          // If achievement has token reward, award it
+          if (achievement.tokenReward !== "0") {
+            const newTokenBalance = (BigInt(user.tokenBalance) + BigInt(achievement.tokenReward)).toString();
+            await db.update(users)
+              .set({ tokenBalance: newTokenBalance })
+              .where(eq(users.id, userId));
+          }
         }
       }
     } catch (error) {
@@ -590,6 +629,153 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error fetching token earnings:", error);
       res.status(500).json({ error: "Failed to fetch token earnings" });
+    }
+  });
+
+  // Get user progression
+  app.get("/api/user/progress/:address", async (req, res) => {
+    try {
+      const { address } = req.params;
+
+      // Get user
+      const user = await db.query.users.findFirst({
+        where: eq(users.address, address),
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Calculate XP needed for next level (increases by 1000 per level)
+      const nextLevelXp = user.level * 1000;
+
+      // Get user achievements
+      const achievements = await db.select({
+        id: userAchievements.id,
+        achievement: {
+          id: achievements.id,
+          name: achievements.name,
+          description: achievements.description,
+          category: achievements.category,
+          points: achievements.points,
+          xpReward: achievements.xpReward,
+          tokenReward: achievements.tokenReward,
+          icon: achievements.icon,
+        },
+        isCompleted: sql<boolean>`true`.as("isCompleted"),
+      })
+        .from(achievements)
+        .leftJoin(
+          userAchievements,
+          and(
+            eq(userAchievements.achievementId, achievements.id),
+            eq(userAchievements.userId, user.id)
+          )
+        )
+        .where(eq(achievements.category, "onboarding"))
+        .orderBy(achievements.order);
+
+      // Get achievement counts
+      const [counts] = await db.select({
+        total: sql<number>`count(*)`,
+        completed: sql<number>`count(${userAchievements.id})`,
+      })
+        .from(achievements)
+        .leftJoin(
+          userAchievements,
+          and(
+            eq(userAchievements.achievementId, achievements.id),
+            eq(userAchievements.userId, user.id)
+          )
+        )
+        .where(eq(achievements.category, "onboarding"))
+        .execute();
+
+      res.json({
+        level: user.level,
+        xp: user.xp,
+        nextLevelXp,
+        achievements,
+        totalAchievements: counts?.total || 0,
+        completedAchievements: counts?.completed || 0,
+      });
+    } catch (error) {
+      console.error("Error fetching user progress:", error);
+      res.status(500).json({ error: "Failed to fetch user progress" });
+    }
+  });
+
+  // Initialize default onboarding achievements
+  app.post("/api/achievements/init", async (_req, res) => {
+    try {
+      const onboardingAchievements = [
+        {
+          name: "Web3 Newcomer",
+          description: "Connect your wallet for the first time",
+          category: "onboarding",
+          criteria: { type: "web3_interaction", threshold: 1 },
+          points: 10,
+          xpReward: 100,
+          tokenReward: "10",
+          icon: "wallet",
+          order: 1,
+        },
+        {
+          name: "Token Pioneer",
+          description: "Mint your first LENI tokens",
+          category: "onboarding",
+          criteria: { type: "first_mint", threshold: 1 },
+          points: 20,
+          xpReward: 200,
+          tokenReward: "20",
+          icon: "coins",
+          order: 2,
+        },
+        {
+          name: "Community Member",
+          description: "Join your first community",
+          category: "onboarding",
+          criteria: { type: "community_engagement", threshold: 1 },
+          points: 30,
+          xpReward: 300,
+          tokenReward: "30",
+          icon: "users",
+          order: 3,
+        },
+        {
+          name: "Social Butterfly",
+          description: "Create your first post",
+          category: "onboarding",
+          criteria: { type: "post_count", threshold: 1 },
+          points: 40,
+          xpReward: 400,
+          tokenReward: "40",
+          icon: "message-square",
+          order: 4,
+        },
+        {
+          name: "Token Trader",
+          description: "Make your first token transfer",
+          category: "onboarding",
+          criteria: { type: "token_transfer", threshold: 1 },
+          points: 50,
+          xpReward: 500,
+          tokenReward: "50",
+          icon: "arrow-right-left",
+          order: 5,
+        },
+      ];
+
+      for (const achievement of onboardingAchievements) {
+        await db.insert(achievements)
+          .values(achievement)
+          .onConflictDoNothing();
+      }
+
+      res.json({ message: "Onboarding achievements initialized" });
+    } catch (error) {
+      console.error("Error initializing achievements:", error);
+      res.status(500).json({ error: "Failed to initialize achievements" });
     }
   });
 
