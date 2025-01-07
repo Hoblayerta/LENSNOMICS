@@ -1,6 +1,6 @@
-import { ethers } from 'hardhat';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
+const { ethers } = require("hardhat");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
   console.log('🚀 Starting deployment to Lens Network Sepolia Testnet...');
@@ -28,8 +28,8 @@ async function main() {
     timestamp: new Date().toISOString(),
   };
 
-  writeFileSync(
-    join(__dirname, '..', 'deployment.json'),
+  fs.writeFileSync(
+    path.join(__dirname, '..', 'deployment.json'),
     JSON.stringify(deploymentInfo, null, 2)
   );
 
