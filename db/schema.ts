@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, uniqueIndex, json } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
@@ -59,11 +59,33 @@ export const votes = pgTable("votes", {
   postUserIdx: uniqueIndex('post_user_vote_idx').on(table.postId, table.userId),
 }));
 
-// Define relationships
+export const achievements = pgTable("achievements", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  criteria: json("criteria").$type<{
+    type: "post_count" | "like_count" | "comment_count" | "token_balance";
+    threshold: number;
+  }>().notNull(),
+  points: integer("points").notNull(),
+  icon: text("icon").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userAchievements = pgTable("user_achievements", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  achievementId: integer("achievement_id").references(() => achievements.id),
+  unlockedAt: timestamp("unlocked_at").defaultNow(),
+}, (table) => ({
+  userAchievementIdx: uniqueIndex('user_achievement_idx').on(table.userId, table.achievementId),
+}));
+
 export const usersRelations = relations(users, ({ many }) => ({
   posts: many(posts),
   communityMemberships: many(communityMembers),
   createdCommunities: many(communities),
+  achievements: many(userAchievements),
 }));
 
 export const communitiesRelations = relations(communities, ({ one, many }) => ({
@@ -89,12 +111,18 @@ export const votesRelations = relations(votes, ({ one }) => ({
   post: one(posts, { fields: [votes.postId], references: [posts.id] }),
 }));
 
-// Export types and schemas
+export const achievementsRelations = relations(achievements, ({ many }) => ({
+  userAchievements: many(userAchievements),
+}));
+
+
 export type User = typeof users.$inferSelect;
 export type Community = typeof communities.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type Vote = typeof votes.$inferSelect;
+export type Achievement = typeof achievements.$inferSelect;
+export type UserAchievement = typeof userAchievements.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
@@ -102,3 +130,5 @@ export const insertCommunitySchema = createInsertSchema(communities);
 export const selectCommunitySchema = createSelectSchema(communities);
 export const insertPostSchema = createInsertSchema(posts);
 export const selectPostSchema = createSelectSchema(posts);
+export const insertAchievementSchema = createInsertSchema(achievements);
+export const selectAchievementSchema = createSelectSchema(achievements);

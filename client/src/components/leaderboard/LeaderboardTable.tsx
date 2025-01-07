@@ -76,12 +76,12 @@ export function LeaderboardTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {leaderboard?.map((entry) => (
+          {leaderboard?.map((entry, index) => (
             <TableRow key={entry.address}>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  {getRankIcon(entry.rank)}
-                  <span className="font-medium">#{entry.rank}</span>
+                  {getRankIcon(index + 1)}
+                  <span className="font-medium">#{index + 1}</span>
                 </div>
               </TableCell>
               <TableCell>

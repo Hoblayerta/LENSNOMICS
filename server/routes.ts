@@ -1,18 +1,178 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { 
-  communities, 
-  users, 
-  communityMembers, 
+import {
+  communities,
+  users,
+  communityMembers,
   posts,
   comments,
   votes,
+  achievements,
+  userAchievements,
 } from "@db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
+
+  // Initialize default achievements if they don't exist
+  app.post("/api/achievements/init", async (_req, res) => {
+    try {
+      const defaultAchievements = [
+        {
+          name: "First Post",
+          description: "Create your first post in any community",
+          criteria: { type: "post_count", threshold: 1 },
+          points: 10,
+          icon: "pencil",
+        },
+        {
+          name: "Community Builder",
+          description: "Create your own community",
+          criteria: { type: "community_count", threshold: 1 },
+          points: 50,
+          icon: "users",
+        },
+        {
+          name: "Token Collector",
+          description: "Accumulate 1000 community tokens",
+          criteria: { type: "token_balance", threshold: 1000 },
+          points: 100,
+          icon: "coins",
+        },
+        {
+          name: "Active Contributor",
+          description: "Make 10 posts or comments",
+          criteria: { type: "contribution_count", threshold: 10 },
+          points: 25,
+          icon: "message-square",
+        },
+        {
+          name: "Popular Creator",
+          description: "Receive 50 likes on your posts",
+          criteria: { type: "like_count", threshold: 50 },
+          points: 75,
+          icon: "heart",
+        },
+      ];
+
+      for (const achievement of defaultAchievements) {
+        await db.insert(achievements)
+          .values(achievement)
+          .onConflictDoNothing();
+      }
+
+      res.json({ message: "Achievements initialized" });
+    } catch (error) {
+      console.error("Error initializing achievements:", error);
+      res.status(500).json({ error: "Failed to initialize achievements" });
+    }
+  });
+
+  // Get user achievements
+  app.get("/api/leaderboard", async (_req, res) => {
+    try {
+      const leaderboard = await db.select({
+        id: users.id,
+        address: users.address,
+        lensHandle: users.lensHandle,
+        tokenBalance: users.tokenBalance,
+        achievementPoints: db
+          .select({ total: sql`SUM(${achievements.points})` })
+          .from(userAchievements)
+          .innerJoin(achievements, eq(achievements.id, userAchievements.achievementId))
+          .where(eq(userAchievements.userId, users.id))
+          .limit(1),
+        achievements: db
+          .select({
+            name: achievements.name,
+            description: achievements.description,
+            icon: achievements.icon,
+            points: achievements.points,
+          })
+          .from(userAchievements)
+          .innerJoin(achievements, eq(achievements.id, userAchievements.achievementId))
+          .where(eq(userAchievements.userId, users.id)),
+      })
+      .from(users)
+      .orderBy(desc(sql`achievement_points`))
+      .limit(10);
+
+      res.json(leaderboard);
+    } catch (error) {
+      console.error("Error fetching leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
+  // Check and award achievements after certain actions
+  async function checkAndAwardAchievements(userId: number) {
+    try {
+      // Get user stats
+      const stats = await db.select({
+        postCount: sql`COUNT(DISTINCT ${posts.id})`,
+        commentCount: sql`COUNT(DISTINCT ${comments.id})`,
+        likeCount: sql`COUNT(DISTINCT ${votes.id})`,
+        communityCount: sql`COUNT(DISTINCT ${communities.id})`,
+        tokenBalance: users.tokenBalance,
+      })
+      .from(users)
+      .leftJoin(posts, eq(posts.authorId, users.id))
+      .leftJoin(comments, eq(comments.authorId, users.id))
+      .leftJoin(votes, eq(votes.userId, users.id))
+      .leftJoin(communities, eq(communities.creatorId, users.id))
+      .where(eq(users.id, userId))
+      .groupBy(users.id)
+      .execute();
+
+      if (!stats.length) return;
+
+      const userStats = stats[0];
+
+      // Get all achievements
+      const allAchievements = await db.select().from(achievements).execute();
+
+      // Check each achievement
+      for (const achievement of allAchievements) {
+        const { criteria } = achievement;
+        let qualified = false;
+
+        switch (criteria.type) {
+          case "post_count":
+            qualified = userStats.postCount >= criteria.threshold;
+            break;
+          case "like_count":
+            qualified = userStats.likeCount >= criteria.threshold;
+            break;
+          case "comment_count":
+            qualified = userStats.commentCount >= criteria.threshold;
+            break;
+          case "token_balance":
+            qualified = parseInt(userStats.tokenBalance) >= criteria.threshold;
+            break;
+          case "community_count":
+            qualified = userStats.communityCount >= criteria.threshold;
+            break;
+          case "contribution_count":
+            qualified = userStats.postCount + userStats.commentCount >= criteria.threshold;
+            break;
+        }
+
+        if (qualified) {
+          // Award achievement if not already awarded
+          await db.insert(userAchievements)
+            .values({
+              userId,
+              achievementId: achievement.id,
+            })
+            .onConflictDoNothing();
+        }
+      }
+    } catch (error) {
+      console.error("Error checking achievements:", error);
+    }
+  }
 
   // Token Creation endpoint
   app.post("/api/communities/token", async (req, res) => {
@@ -88,6 +248,9 @@ export function registerRoutes(app: Express): Server {
           .set({ tokenBalance: newBalance })
           .where(eq(communityMembers.id, member.id));
       }
+
+      // Check achievements after post creation
+      await checkAndAwardAchievements(authorId);
 
       res.json(newPost);
     } catch (error) {
@@ -251,7 +414,7 @@ export function registerRoutes(app: Express): Server {
 
       if (!user) {
         const [newUser] = await db.insert(users)
-          .values({ 
+          .values({
             address: creatorAddress,
             tokenBalance: "0"
           })
