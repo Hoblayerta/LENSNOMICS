@@ -25,7 +25,7 @@ export function CreatePost() {
         // Check if user has enough tokens
         const hasTokens = await hasEnoughTokens(address);
         if (!hasTokens) {
-          throw new Error("Insufficient tokens to create post");
+          throw new Error("Insufficient LENI tokens to create post");
         }
 
         // Handle the post fee first
@@ -78,7 +78,7 @@ export function CreatePost() {
     <Card className="mb-6">
       <CardContent className="pt-6">
         <Textarea
-          placeholder="What's on your mind? (Costs 0.1 COMM tokens)"
+          placeholder="What's on your mind? (Costs 1 LENI token)"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           className="min-h-[100px] resize-none"
@@ -86,7 +86,7 @@ export function CreatePost() {
       </CardContent>
       <CardFooter className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
-          Fee: 0.1 COMM tokens
+          Fee: 1 LENI token
         </p>
         <Button 
           onClick={handleSubmit}

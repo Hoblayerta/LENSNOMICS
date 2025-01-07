@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Trophy, Coins, Award, Users } from "lucide-react";
+import { Trophy, Coins, Award } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAccount } from "wagmi";
 
 interface LeaderboardEntry {
   address: string;
@@ -20,6 +21,7 @@ interface LeaderboardEntry {
 }
 
 export function TokenLeaderboard() {
+  const { address } = useAccount();
   const { data: leaderboard, isLoading } = useQuery<LeaderboardEntry[]>({
     queryKey: ["/api/leaderboard"],
   });
@@ -48,8 +50,8 @@ export function TokenLeaderboard() {
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Trophy className="h-6 w-6 text-yellow-500" />
-          Token Earnings Leaderboard
+          <Trophy className="h-6 w-6 text-green-500" />
+          LENI Token Leaderboard
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -66,9 +68,11 @@ export function TokenLeaderboard() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="flex items-center gap-4 p-4 rounded-lg bg-card hover:bg-accent/50 transition-colors"
+                className={`flex items-center gap-4 p-4 rounded-lg bg-card hover:bg-accent/50 transition-colors ${
+                  entry.address === address ? "border-2 border-green-500" : ""
+                }`}
               >
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-green-500 to-purple-500 text-white font-bold">
                   {index + 1}
                 </div>
                 <Avatar>
@@ -97,7 +101,7 @@ export function TokenLeaderboard() {
 
           <TabsContent value="achievements" className="mt-4">
             <div className="space-y-4">
-              {leaderboard?.map((entry, index) => (
+              {leaderboard?.map((entry) => (
                 <div key={entry.address} className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Avatar>
@@ -114,9 +118,9 @@ export function TokenLeaderboard() {
                       <Badge
                         key={achievement.name}
                         variant="outline"
-                        className="justify-start py-2"
+                        className="justify-start py-2 bg-gradient-to-r from-green-500/10 to-purple-500/10"
                       >
-                        <Award className="h-4 w-4 mr-2" />
+                        <Award className="h-4 w-4 mr-2 text-green-500" />
                         {achievement.name} ({achievement.points} pts)
                       </Badge>
                     ))}
