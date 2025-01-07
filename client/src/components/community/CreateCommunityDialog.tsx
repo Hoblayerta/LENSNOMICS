@@ -13,6 +13,7 @@ import { useAccount } from "wagmi";
 import { Loader2, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { TokenDeploymentWizard } from "./TokenDeploymentWizard";
 
 const formSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
@@ -38,6 +39,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("community");
+  const [deploymentError, setDeploymentError] = useState<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -50,7 +52,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
   });
 
   const mutation = useMutation({
-    mutationFn: async (data: FormData) => {
+    mutationFn: async (data: FormData & { tokenAddress?: string }) => {
       const response = await fetch("/api/communities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -100,14 +102,27 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
       const tokenValid = await form.trigger(["tokenName", "tokenSymbol"]);
       if (!tokenValid) return;
       setStep("review");
-    } else if (step === "review") {
-      form.handleSubmit((data) => mutation.mutate(data))();
     }
   };
 
   const handleBack = () => {
+    setDeploymentError(null);
     if (step === "token") setStep("community");
     if (step === "review") setStep("token");
+  };
+
+  const handleTokenDeploymentSuccess = (tokenAddress: string) => {
+    const formData = form.getValues();
+    mutation.mutate({ ...formData, tokenAddress });
+  };
+
+  const handleTokenDeploymentError = (error: string) => {
+    setDeploymentError(error);
+    toast({
+      title: "Token Deployment Failed",
+      description: error,
+      variant: "destructive",
+    });
   };
 
   return (
@@ -144,7 +159,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea 
+                        <Textarea
                           placeholder="What is your community about?"
                           className="resize-none"
                           {...field}
@@ -166,7 +181,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
                     <FormItem>
                       <FormLabel>Token Name</FormLabel>
                       <FormControl>
-                        <Input 
+                        <Input
                           placeholder="e.g., Community Token"
                           {...field}
                         />
@@ -183,7 +198,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
                     <FormItem>
                       <FormLabel>Token Symbol</FormLabel>
                       <FormControl>
-                        <Input 
+                        <Input
                           placeholder="e.g., COMM"
                           maxLength={5}
                           {...field}
@@ -198,25 +213,35 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
             )}
 
             {step === "review" && (
-              <Card>
-                <CardContent className="pt-6 space-y-4">
-                  <div>
-                    <h3 className="font-semibold mb-1">Community Details</h3>
-                    <p className="text-sm text-muted-foreground">Name: {form.getValues("name")}</p>
-                    <p className="text-sm text-muted-foreground">Description: {form.getValues("description")}</p>
+              <>
+                <Card>
+                  <CardContent className="pt-6 space-y-4">
+                    <div>
+                      <h3 className="font-semibold mb-1">Community Details</h3>
+                      <p className="text-sm text-muted-foreground">Name: {form.getValues("name")}</p>
+                      <p className="text-sm text-muted-foreground">Description: {form.getValues("description")}</p>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-1">Token Details</h3>
+                      <p className="text-sm text-muted-foreground">Name: {form.getValues("tokenName")}</p>
+                      <p className="text-sm text-muted-foreground">Symbol: {form.getValues("tokenSymbol")}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {deploymentError ? (
+                  <div className="text-sm text-red-500">
+                    {deploymentError}
                   </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Token Details</h3>
-                    <p className="text-sm text-muted-foreground">Name: {form.getValues("tokenName")}</p>
-                    <p className="text-sm text-muted-foreground">Symbol: {form.getValues("tokenSymbol")}</p>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    <p>✓ Community tokens will be created on Lens Network</p>
-                    <p>✓ You will be the community owner</p>
-                    <p>✓ Members can earn tokens through engagement</p>
-                  </div>
-                </CardContent>
-              </Card>
+                ) : (
+                  <TokenDeploymentWizard
+                    tokenName={form.getValues("tokenName")}
+                    tokenSymbol={form.getValues("tokenSymbol")}
+                    onSuccess={handleTokenDeploymentSuccess}
+                    onError={handleTokenDeploymentError}
+                  />
+                )}
+              </>
             )}
 
             <div className="flex justify-between pt-4">
@@ -232,29 +257,16 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
                 </Button>
               )}
 
-              <Button
-                type="button"
-                onClick={handleNext}
-                disabled={mutation.isPending}
-                className={`bg-gradient-to-r from-purple-500 to-blue-500 ${step === "community" ? "ml-auto" : ""}`}
-              >
-                {mutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : step === "review" ? (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    Create Community
-                  </>
-                ) : (
-                  <>
-                    Next
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
+              {step !== "review" && (
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  className={`bg-gradient-to-r from-purple-500 to-blue-500 ${step === "community" ? "ml-auto" : ""}`}
+                >
+                  Next
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
             </div>
           </form>
         </Form>
