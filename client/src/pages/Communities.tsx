@@ -30,13 +30,13 @@ export function Communities() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-blue-500 text-transparent bg-clip-text">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-green-500 to-purple-500 text-transparent bg-clip-text">
           Communities
         </h1>
         {isConnected && (
           <Button 
             onClick={() => setIsCreateOpen(true)}
-            className="bg-gradient-to-r from-purple-500 to-blue-500"
+            className="bg-gradient-to-r from-green-500 to-purple-500 hover:from-green-600 hover:to-purple-600"
           >
             <Plus className="mr-2 h-4 w-4" />
             Create Community

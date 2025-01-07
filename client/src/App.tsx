@@ -21,13 +21,13 @@ function App() {
               <nav className="fixed top-0 left-0 right-0 bg-background border-b border-border z-50 px-4 py-2">
                 <div className="container mx-auto flex justify-between items-center">
                   <div className="flex items-center gap-6">
-                    <a href="/" className="text-xl font-bold bg-gradient-to-r from-purple-500 to-blue-500 text-transparent bg-clip-text">
-                      Community Hub
+                    <a href="/" className="text-xl font-bold bg-gradient-to-r from-green-500 to-purple-500 text-transparent bg-clip-text">
+                      LENSNOMICS
                     </a>
-                    <a href="/communities" className="text-foreground hover:text-primary transition-colors">
+                    <a href="/communities" className="text-foreground hover:text-green-500 transition-colors">
                       Communities
                     </a>
-                    <a href="/profile" className="text-foreground hover:text-primary transition-colors">
+                    <a href="/profile" className="text-foreground hover:text-green-500 transition-colors">
                       Profile
                     </a>
                   </div>

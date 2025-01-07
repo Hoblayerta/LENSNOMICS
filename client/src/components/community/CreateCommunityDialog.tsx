@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { useAccount } from "wagmi";
-import { Loader2, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { Loader2, ArrowRight, ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { TokenDeploymentWizard } from "./TokenDeploymentWizard";
@@ -46,8 +46,8 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
     defaultValues: {
       name: "",
       description: "",
-      tokenName: "",
-      tokenSymbol: "",
+      tokenName: "LENSNOMICS",
+      tokenSymbol: "LENI",
     },
   });
 
@@ -73,7 +73,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
       queryClient.invalidateQueries({ queryKey: ["/api/communities"] });
       toast({
         title: "Success! 🎉",
-        description: "Your community and token have been created successfully!",
+        description: "Your community has been created successfully!",
       });
       form.reset();
       onOpenChange(false);
@@ -182,8 +182,9 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
                       <FormLabel>Token Name</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="e.g., Community Token"
+                          placeholder="e.g., LENSNOMICS"
                           {...field}
+                          disabled
                         />
                       </FormControl>
                       <FormMessage />
@@ -199,10 +200,10 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
                       <FormLabel>Token Symbol</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="e.g., COMM"
+                          placeholder="e.g., LENI"
                           maxLength={5}
                           {...field}
-                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                          disabled
                         />
                       </FormControl>
                       <FormMessage />
