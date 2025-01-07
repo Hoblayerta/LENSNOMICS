@@ -8,12 +8,10 @@ import {
   posts,
   comments,
   votes,
-  challenges,
-  userChallenges,
-  tokenTransactions
+  achievements,
+  userAchievements
 } from "@db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
-import { lensClient } from "@/lib/config";
 
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
@@ -39,17 +37,97 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Auth and User Management
-  app.post("/api/users", async (req, res) => {
+  // Leaderboard endpoint
+  app.get("/api/leaderboard", async (_req, res) => {
     try {
-      const { address, lensHandle } = req.body;
-      const [newUser] = await db.insert(users).values({
-        address,
-        lensHandle,
-      }).returning();
-      res.json(newUser);
+      const leaderboard = await db.query.users.findMany({
+        with: {
+          achievements: {
+            with: {
+              achievement: true,
+            },
+          },
+        },
+        orderBy: [desc(users.achievementPoints)],
+        limit: 10,
+      });
+
+      const rankedLeaderboard = leaderboard.map((user, index) => ({
+        address: user.address,
+        lensHandle: user.lensHandle,
+        balance: user.tokenBalance,
+        achievementPoints: user.achievementPoints,
+        rank: index + 1,
+        achievements: user.achievements
+          .filter(ua => ua.achievement !== null)
+          .map(ua => ({
+            name: ua.achievement!.name,
+            description: ua.achievement!.description,
+            icon: ua.achievement!.icon,
+            points: ua.achievement!.points,
+          })),
+      }));
+
+      res.json(rankedLeaderboard);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create user" });
+      console.error("Error fetching leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
+  // Achievement endpoints
+  app.get("/api/achievements", async (_req, res) => {
+    try {
+      const allAchievements = await db.query.achievements.findMany({
+        orderBy: [desc(achievements.points)],
+      });
+      res.json(allAchievements);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch achievements" });
+    }
+  });
+
+  app.post("/api/users/:userId/achievements/:achievementId", async (req, res) => {
+    try {
+      const { userId, achievementId } = req.params;
+
+      // Check if achievement already unlocked
+      const existingAchievement = await db.query.userAchievements.findFirst({
+        where: and(
+          eq(userAchievements.userId, parseInt(userId)),
+          eq(userAchievements.achievementId, parseInt(achievementId))
+        ),
+      });
+
+      if (existingAchievement) {
+        return res.status(400).json({ error: "Achievement already unlocked" });
+      }
+
+      // Get achievement details
+      const achievement = await db.query.achievements.findFirst({
+        where: eq(achievements.id, parseInt(achievementId)),
+      });
+
+      if (!achievement) {
+        return res.status(404).json({ error: "Achievement not found" });
+      }
+
+      // Add achievement to user
+      await db.insert(userAchievements).values({
+        userId: parseInt(userId),
+        achievementId: parseInt(achievementId),
+      });
+
+      // Update user achievement points
+      await db.update(users)
+        .set({
+          achievementPoints: sql`${users.achievementPoints} + ${achievement.points}`,
+        })
+        .where(eq(users.id, parseInt(userId)));
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to unlock achievement" });
     }
   });
 
@@ -139,15 +217,6 @@ export function registerRoutes(app: Express): Server {
         await db.update(users)
           .set({ tokenBalance: newBalance })
           .where(eq(users.id, post.author.id));
-
-        // Record token transaction
-        await db.insert(tokenTransactions).values({
-          fromAddress: "0x0", // System reward
-          toAddress: post.author.address,
-          amount: "1",
-          type: "reward",
-          txHash: `reward_${Date.now()}`, // Placeholder for demo
-        });
       }
 
       await db.update(posts)
@@ -235,15 +304,6 @@ export function registerRoutes(app: Express): Server {
             await db.update(users)
               .set({ tokenBalance: newBalance })
               .where(eq(users.id, userId));
-
-            // Record token transaction
-            await db.insert(tokenTransactions).values({
-              fromAddress: "0x0", // System reward
-              toAddress: user.address,
-              amount: challenge.tokenReward,
-              type: "challenge_completion",
-              txHash: `challenge_${Date.now()}`, // Placeholder for demo
-            });
           }
         }
 
@@ -270,41 +330,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Leaderboard endpoint
-  app.get("/api/leaderboard", async (_req, res) => {
-    try {
-      const leaderboard = await db.query.users.findMany({
-        with: {
-          achievements: {
-            with: {
-              achievement: true,
-            },
-          },
-        },
-        orderBy: [desc(users.achievementPoints)],
-        limit: 10,
-      });
-
-      const rankedLeaderboard = leaderboard.map((user, index) => ({
-        address: user.address,
-        lensHandle: user.lensHandle,
-        balance: user.tokenBalance,
-        achievementPoints: user.achievementPoints,
-        rank: index + 1,
-        achievements: user.achievements.map(ua => ({
-          name: ua.achievement.name,
-          description: ua.achievement.description,
-          icon: ua.achievement.icon,
-          points: ua.achievement.points,
-        })),
-      }));
-
-      res.json(rankedLeaderboard);
-    } catch (error) {
-      console.error("Error fetching leaderboard:", error);
-      res.status(500).json({ error: "Failed to fetch leaderboard" });
-    }
-  });
 
   // Communities endpoints
   app.get("/api/communities", async (_req, res) => {
@@ -394,15 +419,25 @@ export function registerRoutes(app: Express): Server {
           tokenBalance: "1000000", // Initial token allocation for creator
         });
 
-      // Record token transaction
-      await db.insert(tokenTransactions)
-        .values({
-          fromAddress: "0x0", // System mint
-          toAddress: creatorAddress,
-          amount: "1000000",
-          type: "mint",
-          txHash: `mint_${Date.now()}`, // Placeholder for demo
-        });
+      // Unlock the Community Builder achievement
+      const achievement = await db.query.achievements.findFirst({
+        where: eq(achievements.name, "Community Builder"),
+      });
+
+      if (achievement) {
+        await db.insert(userAchievements)
+          .values({
+            userId: user.id,
+            achievementId: achievement.id,
+          })
+          .onConflictDoNothing();
+
+        await db.update(users)
+          .set({
+            achievementPoints: sql`${users.achievementPoints} + ${achievement.points}`,
+          })
+          .where(eq(users.id, user.id));
+      }
 
       res.json(community);
     } catch (error) {
