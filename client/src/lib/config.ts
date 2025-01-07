@@ -29,6 +29,10 @@ export const lensTestnet = {
     },
   },
   testnet: true,
+  contracts: {
+    // Add this to prevent ENS resolver error
+    ensUniversalResolver: undefined
+  }
 } as const satisfies Chain;
 
 // Configure chains & providers with Lens testnet
