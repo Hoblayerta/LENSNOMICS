@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
+import { ethers } from "ethers";
 import {
   communities,
   users,
@@ -13,8 +14,131 @@ import {
 } from "@db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
+// Import ABI
+import CommunityTokenFactoryABI from "../artifacts/contracts/CommunityTokenFactory.sol/CommunityTokenFactory.json";
+
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
+  const PORT = process.env.PORT || 5000;
+
+  // Initialize Ethereum provider and contract
+  const provider = new ethers.JsonRpcProvider("https://rpc.testnet.lens.dev");
+  const factoryAddress = process.env.FACTORY_ADDRESS;
+
+  if (!factoryAddress) {
+    console.error("Factory address not found in environment variables");
+  }
+
+  // Token Creation endpoint
+  app.post("/api/communities/token", async (req, res) => {
+    try {
+      const { name, symbol, creatorAddress } = req.body;
+
+      if (!factoryAddress) {
+        throw new Error("Factory address not configured");
+      }
+
+      if (!process.env.DEPLOYER_PRIVATE_KEY) {
+        throw new Error("Deployer private key not configured");
+      }
+
+      const wallet = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
+      const factory = new ethers.Contract(factoryAddress, CommunityTokenFactoryABI.abi, wallet);
+
+      // Create token with initial supply of 1,000,000 tokens
+      const tx = await factory.createCommunityToken(name, symbol, 1000000);
+      console.log("Creating token transaction:", tx.hash);
+
+      const receipt = await tx.wait();
+      console.log("Transaction receipt:", receipt);
+
+      // Get token address from event logs
+      const event = receipt.logs.find(
+        (log: any) => log.topics[0] === factory.interface.getEventTopic("CommunityTokenCreated")
+      );
+
+      if (!event) {
+        throw new Error("Token creation event not found in transaction logs");
+      }
+
+      const tokenAddress = event.args[0];
+      console.log("Created token at address:", tokenAddress);
+
+      res.json({
+        tokenAddress,
+        name,
+        symbol,
+      });
+    } catch (error) {
+      console.error("Error creating token:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create token" });
+    }
+  });
+
+  // Communities endpoints
+  app.post("/api/communities", async (req, res) => {
+    try {
+      const { name, description, tokenName, tokenSymbol, creatorAddress } = req.body;
+
+      // First create the token
+      const tokenResponse = await fetch(`http://localhost:${PORT}/api/communities/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: tokenName,
+          symbol: tokenSymbol,
+          creatorAddress,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        const error = await tokenResponse.text();
+        throw new Error(error);
+      }
+
+      const { tokenAddress } = await tokenResponse.json();
+
+      // Get or create user
+      let user = await db.query.users.findFirst({
+        where: eq(users.address, creatorAddress),
+      });
+
+      if (!user) {
+        const [newUser] = await db.insert(users)
+          .values({
+            address: creatorAddress,
+            tokenBalance: "0"
+          })
+          .returning();
+        user = newUser;
+      }
+
+      // Create community with the token address
+      const [community] = await db.insert(communities)
+        .values({
+          name,
+          description,
+          creatorId: user.id,
+          tokenAddress,
+          tokenSymbol,
+          initialTokens: "1000", // Initial tokens for new members
+        })
+        .returning();
+
+      // Add creator as first member with initial tokens
+      await db.insert(communityMembers)
+        .values({
+          userId: user.id,
+          communityId: community.id,
+          tokenBalance: "10000", // Creator gets more initial tokens
+        });
+
+      res.json(community);
+    } catch (error) {
+      console.error("Error creating community:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create community" });
+    }
+  });
 
   // Initialize default achievements if they don't exist
   app.post("/api/achievements/init", async (_req, res) => {
@@ -181,25 +305,6 @@ export function registerRoutes(app: Express): Server {
       console.error("Error checking achievements:", error);
     }
   }
-
-  // Token Creation endpoint
-  app.post("/api/communities/token", async (req, res) => {
-    try {
-      const { name, symbol, creatorAddress } = req.body;
-
-      // Generate a deterministic token address based on community name and creator
-      const tokenAddress = `0x${Buffer.from(`${name}${creatorAddress}${Date.now()}`).toString('hex').slice(0, 40)}`;
-
-      res.json({
-        tokenAddress,
-        name,
-        symbol,
-      });
-    } catch (error) {
-      console.error("Error creating token:", error);
-      res.status(500).json({ error: "Failed to create token" });
-    }
-  });
 
   // Posts endpoint
   app.get("/api/posts", async (_req, res) => {
@@ -394,68 +499,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/communities", async (req, res) => {
-    try {
-      const { name, description, tokenName, tokenSymbol, creatorAddress } = req.body;
-
-      // First create the token
-      const tokenResponse = await fetch(`http://localhost:${process.env.PORT}/api/communities/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: tokenName,
-          symbol: tokenSymbol,
-          creatorAddress,
-        }),
-      });
-
-      if (!tokenResponse.ok) {
-        throw new Error("Failed to create token");
-      }
-
-      const { tokenAddress } = await tokenResponse.json();
-
-      // Get or create user
-      let user = await db.query.users.findFirst({
-        where: eq(users.address, creatorAddress),
-      });
-
-      if (!user) {
-        const [newUser] = await db.insert(users)
-          .values({
-            address: creatorAddress,
-            tokenBalance: "0"
-          })
-          .returning();
-        user = newUser;
-      }
-
-      // Create community with the token address
-      const [community] = await db.insert(communities)
-        .values({
-          name,
-          description,
-          creatorId: user.id,
-          tokenAddress,
-          tokenSymbol,
-          initialTokens: "1000", // Initial tokens for new members
-        })
-        .returning();
-
-      // Add creator as first member with initial tokens
-      await db.insert(communityMembers)
-        .values({
-          userId: user.id,
-          communityId: community.id,
-          tokenBalance: "10000", // Creator gets more initial tokens
-        });
-
-      res.json(community);
-    } catch (error) {
-      console.error("Error creating community:", error);
-      res.status(500).json({ error: "Failed to create community" });
-    }
-  });
 
   // Join community endpoint
   app.post("/api/communities/:communityId/join", async (req, res) => {

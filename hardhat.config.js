@@ -1,10 +1,9 @@
-import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
-import dotenv from "dotenv";
+require("@nomicfoundation/hardhat-toolbox");
+require("dotenv").config();
 
-dotenv.config();
-
-const config: HardhatUserConfig = {
+/** @type import('hardhat/config').HardhatUserConfig */
+module.exports = {
+  analytics: false, // Disable analytics
   solidity: {
     version: "0.8.20",
     settings: {
@@ -17,9 +16,10 @@ const config: HardhatUserConfig = {
   networks: {
     lensTestnet: {
       url: "https://rpc.testnet.lens.dev",
-      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY],
       chainId: 37111,
-      timeout: 60000, // Increased timeout for testnet
+      timeout: 120000,
+      gasPrice: "auto",
     }
   },
   paths: {
@@ -29,5 +29,3 @@ const config: HardhatUserConfig = {
     artifacts: "./artifacts"
   }
 };
-
-export default config;

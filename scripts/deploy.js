@@ -1,6 +1,6 @@
-import { ethers } from 'hardhat';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
+const { ethers } = require("hardhat");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
   console.log('🚀 Starting deployment to Lens Network Sepolia Testnet...');
@@ -28,12 +28,26 @@ async function main() {
     timestamp: new Date().toISOString(),
   };
 
-  writeFileSync(
-    join(__dirname, '..', 'deployment.json'),
-    JSON.stringify(deploymentInfo, null, 2)
-  );
+  // Create a .env file with the factory address
+  const envPath = path.join(__dirname, '..', '.env');
+  let envContent = '';
+  
+  try {
+    envContent = fs.readFileSync(envPath, 'utf8');
+  } catch (error) {
+    // File doesn't exist, create it
+  }
 
-  console.log('\n📝 Deployment information saved to deployment.json');
+  // Update or add FACTORY_ADDRESS
+  if (envContent.includes('FACTORY_ADDRESS=')) {
+    envContent = envContent.replace(/FACTORY_ADDRESS=.*\n/, `FACTORY_ADDRESS=${factoryAddress}\n`);
+  } else {
+    envContent += `\nFACTORY_ADDRESS=${factoryAddress}\n`;
+  }
+
+  fs.writeFileSync(envPath, envContent);
+
+  console.log('\n📝 Factory address saved to .env file');
   console.log('\n✨ Deployment completed successfully!');
 }
 
