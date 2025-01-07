@@ -14,42 +14,125 @@ import {
 } from "@db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
-// Import ABI
-import CommunityTokenFactoryABI from "../artifacts/contracts/CommunityTokenFactory.sol/CommunityTokenFactory.json";
+// Import ABI for LENI token
+const LENI_TOKEN_ABI = [
+  "function balanceOf(address owner) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function payPostFee(address poster) external returns (bool)",
+];
 
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
   const PORT = process.env.PORT || 5000;
 
-  // Initialize Ethereum provider and contract
+  // Initialize Ethereum provider and LENI token contract
   const provider = new ethers.JsonRpcProvider("https://rpc.testnet.lens.dev");
-  // Use the existing factory address
-  const factoryAddress = "0xC94E29B30D5A33556C26e8188B3ce3c6d1003F86";
+  const LENI_TOKEN_ADDRESS = "0xC94E29B30D5A33556C26e8188B3ce3c6d1003F86";
+  const POST_FEE = ethers.parseEther("1"); // 1 LENI token per post
 
-  console.log('Initializing routes with factory address:', factoryAddress);
+  // Initialize contract with the deployer's private key for transactions
+  const signer = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY || "", provider);
+  const leniToken = new ethers.Contract(LENI_TOKEN_ADDRESS, LENI_TOKEN_ABI, signer);
 
-  // Token Creation endpoint - Using existing factory
-  app.post("/api/communities/token", async (req, res) => {
+  console.log('Initializing routes with LENI token address:', LENI_TOKEN_ADDRESS);
+
+  // Posts endpoint with LENI token integration
+  app.post("/api/posts", async (req, res) => {
     try {
-      const { name, symbol } = req.body;
+      const { content, authorId, communityId } = req.body;
 
-      // Connect to existing factory contract
-      const factory = new ethers.Contract(factoryAddress, CommunityTokenFactoryABI.abi, provider);
-
-      // For demo purposes, we'll simulate token creation success
-      // In production, you would interact with the actual contract
-      const mockTokenAddress = "0x" + Array(40).fill("0").join("");
-
-      console.log('Simulating token creation for:', { name, symbol });
-
-      res.json({
-        tokenAddress: mockTokenAddress,
-        name,
-        symbol,
+      // Verify user has enough LENI tokens
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, authorId),
       });
+
+      if (!user?.address) {
+        return res.status(400).json({ error: "User address not found" });
+      }
+
+      try {
+        // Check user's LENI balance
+        const balance = await leniToken.balanceOf(user.address);
+
+        if (balance < POST_FEE) {
+          return res.status(400).json({ 
+            error: `Insufficient LENI tokens. You need at least ${ethers.formatEther(POST_FEE)} LENI tokens to create a post.` 
+          });
+        }
+
+        // Execute the post fee payment
+        const tx = await leniToken.payPostFee(user.address);
+        await tx.wait(); // Wait for transaction confirmation
+
+        console.log(`Post fee paid by ${user.address}. Transaction hash: ${tx.hash}`);
+      } catch (error) {
+        console.error("Error processing LENI token transaction:", error);
+        return res.status(500).json({ error: "Failed to process token transaction" });
+      }
+
+      // Create the post after successful token transfer
+      const [newPost] = await db.insert(posts)
+        .values({
+          content,
+          authorId,
+          communityId,
+        })
+        .returning();
+
+      // Update user's token balance in the database
+      const member = await db.query.communityMembers.findFirst({
+        where: and(
+          eq(communityMembers.userId, authorId),
+          eq(communityMembers.communityId, communityId)
+        ),
+      });
+
+      if (member) {
+        // Get updated balance from blockchain
+        const newBalance = await leniToken.balanceOf(user.address);
+        await db.update(communityMembers)
+          .set({ tokenBalance: newBalance.toString() })
+          .where(eq(communityMembers.id, member.id));
+      }
+
+      // Check achievements after post creation
+      await checkAndAwardAchievements(authorId);
+
+      res.json(newPost);
     } catch (error) {
-      console.error("Error creating token:", error);
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create token" });
+      console.error("Error creating post:", error);
+      res.status(500).json({ error: "Failed to create post" });
+    }
+  });
+
+  app.get("/api/posts", async (_req, res) => {
+    try {
+      const allPosts = await db.select({
+        id: posts.id,
+        content: posts.content,
+        createdAt: posts.createdAt,
+        author: {
+          id: users.id,
+          address: users.address,
+          lensHandle: users.lensHandle,
+        },
+        community: {
+          id: communities.id,
+          name: communities.name,
+          tokenSymbol: communities.tokenSymbol,
+        },
+      })
+      .from(posts)
+      .leftJoin(users, eq(posts.authorId, users.id))
+      .leftJoin(communities, eq(posts.communityId, communities.id))
+      .orderBy(desc(posts.createdAt));
+
+      res.json(allPosts);
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+      res.status(500).json({ error: "Failed to fetch posts" });
     }
   });
 
@@ -284,71 +367,31 @@ export function registerRoutes(app: Express): Server {
     }
   }
 
-  // Posts endpoint
-  app.get("/api/posts", async (_req, res) => {
+  // Token Creation endpoint - Using existing factory
+  app.post("/api/communities/token", async (req, res) => {
     try {
-      const allPosts = await db.select({
-        id: posts.id,
-        content: posts.content,
-        createdAt: posts.createdAt,
-        author: {
-          id: users.id,
-          address: users.address,
-          lensHandle: users.lensHandle,
-        },
-        community: {
-          id: communities.id,
-          name: communities.name,
-          tokenSymbol: communities.tokenSymbol,
-        },
-      })
-      .from(posts)
-      .leftJoin(users, eq(posts.authorId, users.id))
-      .leftJoin(communities, eq(posts.communityId, communities.id))
-      .orderBy(desc(posts.createdAt));
+      const { name, symbol } = req.body;
 
-      res.json(allPosts);
-    } catch (error) {
-      console.error("Error fetching posts:", error);
-      res.status(500).json({ error: "Failed to fetch posts" });
-    }
-  });
+      // Connect to existing factory contract
+      const factory = new ethers.Contract(LENI_TOKEN_ADDRESS, LENI_TOKEN_ABI, provider);
 
-  app.post("/api/posts", async (req, res) => {
-    try {
-      const { content, authorId, communityId } = req.body;
-      const [newPost] = await db.insert(posts)
-        .values({
-          content,
-          authorId,
-          communityId,
-        })
-        .returning();
+      // For demo purposes, we'll simulate token creation success
+      // In production, you would interact with the actual contract
+      const mockTokenAddress = "0x" + Array(40).fill("0").join("");
 
-      // Reward poster with tokens
-      const member = await db.query.communityMembers.findFirst({
-        where: and(
-          eq(communityMembers.userId, authorId),
-          eq(communityMembers.communityId, communityId)
-        ),
+      console.log('Simulating token creation for:', { name, symbol });
+
+      res.json({
+        tokenAddress: mockTokenAddress,
+        name,
+        symbol,
       });
-
-      if (member) {
-        const newBalance = (BigInt(member.tokenBalance || "0") + BigInt("1")).toString();
-        await db.update(communityMembers)
-          .set({ tokenBalance: newBalance })
-          .where(eq(communityMembers.id, member.id));
-      }
-
-      // Check achievements after post creation
-      await checkAndAwardAchievements(authorId);
-
-      res.json(newPost);
     } catch (error) {
-      console.error("Error creating post:", error);
-      res.status(500).json({ error: "Failed to create post" });
+      console.error("Error creating token:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create token" });
     }
   });
+
 
   // Comments
   app.get("/api/posts/:postId/comments", async (req, res) => {
