@@ -10,13 +10,18 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { useAccount } from "wagmi";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 const formSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   tokenName: z.string().min(1, "Token name is required"),
-  tokenSymbol: z.string().min(1, "Token symbol is required").max(5, "Token symbol must be 5 characters or less"),
+  tokenSymbol: z.string()
+    .min(1, "Token symbol is required")
+    .max(5, "Token symbol must be 5 characters or less")
+    .regex(/^[A-Z]+$/, "Token symbol must be uppercase letters only"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -26,10 +31,13 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
+type Step = "community" | "token" | "review";
+
 export function CreateCommunityDialog({ open, onOpenChange }: Props) {
   const { address } = useAccount();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [step, setStep] = useState<Step>("community");
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -62,8 +70,8 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/communities"] });
       toast({
-        title: "Success",
-        description: "Community created successfully with its own token!",
+        title: "Success! 🎉",
+        description: "Your community and token have been created successfully!",
       });
       form.reset();
       onOpenChange(false);
@@ -77,94 +85,174 @@ export function CreateCommunityDialog({ open, onOpenChange }: Props) {
     },
   });
 
+  const progress = {
+    community: 33,
+    token: 66,
+    review: 100,
+  }[step];
+
+  const handleNext = async () => {
+    if (step === "community") {
+      const communityValid = await form.trigger(["name", "description"]);
+      if (!communityValid) return;
+      setStep("token");
+    } else if (step === "token") {
+      const tokenValid = await form.trigger(["tokenName", "tokenSymbol"]);
+      if (!tokenValid) return;
+      setStep("review");
+    } else if (step === "review") {
+      form.handleSubmit((data) => mutation.mutate(data))();
+    }
+  };
+
+  const handleBack = () => {
+    if (step === "token") setStep("community");
+    if (step === "review") setStep("token");
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Create New Community</DialogTitle>
         </DialogHeader>
+
+        <Progress value={progress} className="mb-4" />
+
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Community Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter community name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form className="space-y-4">
+            {step === "community" && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Community Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter community name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="What is your community about?"
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="What is your community about?"
+                          className="resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
 
-            <FormField
-              control={form.control}
-              name="tokenName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Token Name</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="e.g., Community Token"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {step === "token" && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="tokenName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Token Name</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g., Community Token"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="tokenSymbol"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Token Symbol</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="e.g., COMM"
-                      maxLength={5}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="tokenSymbol"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Token Symbol</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g., COMM"
+                          maxLength={5}
+                          {...field}
+                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
 
-            <div className="flex justify-end">
+            {step === "review" && (
+              <Card>
+                <CardContent className="pt-6 space-y-4">
+                  <div>
+                    <h3 className="font-semibold mb-1">Community Details</h3>
+                    <p className="text-sm text-muted-foreground">Name: {form.getValues("name")}</p>
+                    <p className="text-sm text-muted-foreground">Description: {form.getValues("description")}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">Token Details</h3>
+                    <p className="text-sm text-muted-foreground">Name: {form.getValues("tokenName")}</p>
+                    <p className="text-sm text-muted-foreground">Symbol: {form.getValues("tokenSymbol")}</p>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    <p>✓ Community tokens will be created on Lens Network</p>
+                    <p>✓ You will be the community owner</p>
+                    <p>✓ Members can earn tokens through engagement</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="flex justify-between pt-4">
+              {step !== "community" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleBack}
+                  disabled={mutation.isPending}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+              )}
+
               <Button
-                type="submit"
+                type="button"
+                onClick={handleNext}
                 disabled={mutation.isPending}
-                className="bg-gradient-to-r from-purple-500 to-blue-500"
+                className={`bg-gradient-to-r from-purple-500 to-blue-500 ${step === "community" ? "ml-auto" : ""}`}
               >
                 {mutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating Community...
+                    Creating...
+                  </>
+                ) : step === "review" ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Create Community
                   </>
                 ) : (
-                  "Create Community"
+                  <>
+                    Next
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
                 )}
               </Button>
             </div>
