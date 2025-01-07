@@ -1,19 +1,35 @@
-import { createConfig, mainnet } from 'wagmi';
-import { createPublicClient, http } from 'viem';
-import { LensConfig, development } from '@lens-protocol/client';
+import { configureChains, createConfig } from 'wagmi';
+import { polygonMumbai } from 'wagmi/chains';
+import { InjectedConnector } from 'wagmi/connectors/injected';
+import { publicProvider } from 'wagmi/providers/public';
+import { development, LensClient } from '@lens-protocol/client';
 
-// Configure wagmi client
-const publicClient = createPublicClient({
-  chain: mainnet,
-  transport: http()
-});
+// Configure chains & providers
+const { chains, publicClient, webSocketPublicClient } = configureChains(
+  [polygonMumbai],
+  [publicProvider()]
+);
 
-// Lens Protocol configuration
-export const lensConfig: LensConfig = {
-  environment: development
-};
-
-// Wagmi client configuration
+// Set up wagmi config
 export const config = createConfig({
+  autoConnect: true,
+  connectors: [
+    new InjectedConnector({
+      chains,
+      options: {
+        name: 'Injected',
+        shimDisconnect: true,
+      },
+    }),
+  ],
   publicClient,
+  webSocketPublicClient,
 });
+
+// Initialize Lens Protocol client
+export const lensClient = new LensClient({
+  environment: development
+});
+
+// Export chains for use in other parts of the app
+export { chains };

@@ -5,27 +5,28 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
 import { handlePostFee, hasEnoughTokens } from "@/lib/web3";
-import { useAccount, useSigner } from "wagmi";
+import { useAccount, useProvider, useSendTransaction } from "wagmi";
 import { Loader2 } from "lucide-react";
 
 export function CreatePost() {
   const [content, setContent] = useState("");
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { address } = useAccount();
-  const { data: signer } = useSigner();
+  const { address, isConnected } = useAccount();
+  const provider = useProvider();
+  const { sendTransaction } = useSendTransaction();
 
   const mutation = useMutation({
     mutationFn: async () => {
       try {
         // Check if user has enough tokens
-        const hasTokens = await hasEnoughTokens(address!, signer!.provider);
+        const hasTokens = await hasEnoughTokens(address!, provider);
         if (!hasTokens) {
           throw new Error("Insufficient tokens to create post");
         }
 
         // Handle the post fee first
-        await handlePostFee(signer);
+        await handlePostFee(provider);
 
         // After successful fee payment, create the post
         const response = await fetch("/api/posts", {
@@ -56,7 +57,7 @@ export function CreatePost() {
   });
 
   const handleSubmit = () => {
-    if (!address) {
+    if (!isConnected) {
       toast({
         title: "Error",
         description: "Please connect your wallet first",
@@ -86,7 +87,7 @@ export function CreatePost() {
         </p>
         <Button 
           onClick={handleSubmit}
-          disabled={mutation.isPending || !content.trim() || !address}
+          disabled={mutation.isPending || !content.trim() || !isConnected}
           className="bg-gradient-to-r from-purple-500 to-blue-500"
         >
           {mutation.isPending ? (

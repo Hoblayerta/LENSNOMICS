@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
-import { createPublicClient, http, parseEther } from 'viem';
+import { createWalletClient, custom, parseEther } from 'viem';
+import { config } from './config';
 
 // Community token contract address (to be replaced with actual deployment)
 const COMMUNITY_TOKEN_ADDRESS = import.meta.env.VITE_COMMUNITY_TOKEN_ADDRESS || "0x123...";
@@ -7,19 +8,35 @@ const POST_FEE = "0.1"; // 0.1 tokens per post
 
 // Token ABI for the minimal interface we need
 const TOKEN_ABI = [
-  'function balanceOf(address) view returns (uint256)',
-  'function approve(address spender, uint256 amount) returns (bool)',
-  'function transferFrom(address sender, address recipient, uint256 amount) returns (bool)',
-];
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'transfer',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'bool' }]
+  }
+] as const;
 
 export const connectWallet = async () => {
   try {
-    if (!web3Modal) throw new Error("Web3Modal not initialized");
+    if (!window.ethereum) throw new Error("No crypto wallet found");
 
-    const provider = await web3Modal.connect();
-    const ethersProvider = new ethers.BrowserProvider(provider);
-    const signer = await ethersProvider.getSigner();
-    const address = await signer.getAddress();
+    const walletClient = createWalletClient({
+      chain: config.chains[0],
+      transport: custom(window.ethereum)
+    });
+    const [address] = await walletClient.requestAddresses();
+    const provider = walletClient.getProvider();
 
     // Register user in the backend
     await fetch('/api/users', {
@@ -29,8 +46,8 @@ export const connectWallet = async () => {
     });
 
     return {
-      provider: ethersProvider,
-      signer,
+      provider: provider,
+      signer: walletClient,
       address
     };
   } catch (error) {
@@ -40,50 +57,39 @@ export const connectWallet = async () => {
 };
 
 export const disconnectWallet = async () => {
-  if (web3Modal) {
-    await web3Modal.clearCachedProvider();
-  }
+  //  No action needed here for viem
 };
 
-export const getTokenBalance = async (userAddress: string, provider: any) => {
+export const getTokenBalance = async (address: string) => {
   try {
-    const tokenContract = new ethers.Contract(
-      COMMUNITY_TOKEN_ADDRESS,
-      TOKEN_ABI,
-      provider
-    );
+    const data = await config.publicClient.readContract({
+      address: COMMUNITY_TOKEN_ADDRESS as `0x${string}`,
+      abi: TOKEN_ABI,
+      functionName: 'balanceOf',
+      args: [address as `0x${string}`]
+    });
 
-    const balance = await tokenContract.balanceOf(userAddress);
-    return ethers.formatEther(balance);
+    return data.toString();
   } catch (error) {
     console.error("Error fetching token balance:", error);
     return "0";
   }
 };
 
-export const handlePostFee = async (signer: any) => {
+export const handlePostFee = async (address: string) => {
   try {
-    const tokenContract = new ethers.Contract(
-      COMMUNITY_TOKEN_ADDRESS,
-      TOKEN_ABI,
-      signer
-    );
-
-    // Convert fee to wei
     const feeAmount = parseEther(POST_FEE);
 
-    // First approve the contract to spend tokens
-    const approveTx = await tokenContract.approve(COMMUNITY_TOKEN_ADDRESS, feeAmount);
-    await approveTx.wait();
+    const { request } = await config.publicClient.simulateContract({
+      address: COMMUNITY_TOKEN_ADDRESS as `0x${string}`,
+      abi: TOKEN_ABI,
+      functionName: 'transfer',
+      args: [COMMUNITY_TOKEN_ADDRESS as `0x${string}`, feeAmount],
+      account: address as `0x${string}`,
+    });
 
-    // Transfer tokens for the post fee
-    const transferTx = await tokenContract.transferFrom(
-      await signer.getAddress(),
-      COMMUNITY_TOKEN_ADDRESS,
-      feeAmount
-    );
-    await transferTx.wait();
-
+    const hash = await config.publicClient.writeContract(request);
+    await config.publicClient.waitForTransactionReceipt({ hash });
     return true;
   } catch (error) {
     console.error("Error handling post fee:", error);
@@ -91,18 +97,13 @@ export const handlePostFee = async (signer: any) => {
   }
 };
 
-export const hasEnoughTokens = async (userAddress: string, provider: any) => {
-  const balance = await getTokenBalance(userAddress, provider);
-  return parseFloat(balance) >= parseFloat(POST_FEE);
+export const hasEnoughTokens = async (address: string) => {
+  const balance = await getTokenBalance(address);
+  return BigInt(balance) >= parseEther(POST_FEE);
 };
 
-// Configure web3modal for wallet connection
-const providerOptions = {
-  // Add custom providers here if needed
-};
-
-const web3Modal = typeof window !== 'undefined' ? new Web3Modal({
-  network: "testnet", // Using testnet for development
-  cacheProvider: true,
-  providerOptions
-}) : null;
+declare global {
+  interface Window {
+    ethereum: any;
+  }
+}
