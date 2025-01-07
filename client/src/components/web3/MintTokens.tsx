@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { leniContract } from "@/lib/contract";
+import { getSignedContract } from "@/lib/contract";
 import { parseEther } from "viem";
 
 const DAILY_MINT_LIMIT = "10";
@@ -28,8 +28,11 @@ export function MintTokens() {
       setIsMinting(true);
       const parsedAmount = parseEther(amount);
 
+      // Get contract with signer
+      const contract = await getSignedContract();
+
       // Call mint function on the contract
-      const tx = await leniContract.call("mint", [parsedAmount]);
+      const tx = await contract.call("mint", [parsedAmount]);
       await tx.wait();
 
       toast({
