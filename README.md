@@ -24,6 +24,7 @@ A cutting-edge decentralized social platform that revolutionizes community inter
   - Node.js with Express
   - PostgreSQL Database
   - Drizzle ORM
+    
 **AI Agent**:
 -ElizaOS 
 ## 🏗️ Local Setup
